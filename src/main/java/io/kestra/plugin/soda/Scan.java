@@ -15,11 +15,11 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
+import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
-import javax.validation.constraints.NotEmpty;
-import javax.validation.constraints.NotNull;
 
 @SuperBuilder
 @ToString
@@ -88,7 +88,10 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
         String main = "import sys\n" +
             "import json\n" +
             "from soda.scan import Scan\n" +
-            "from soda.soda_cloud.soda_cloud import SodaCloud\n" +
+            "try:\n" +
+            "   from soda.soda_cloud.soda_cloud import SodaCloud\n" +
+            "except ImportError:\n" +
+            "   from soda.cloud.soda_cloud import SodaCloud\n" +
             "from soda.common.logs import configure_logging\n" +
             "\n" +
             "configure_logging()\n" +
