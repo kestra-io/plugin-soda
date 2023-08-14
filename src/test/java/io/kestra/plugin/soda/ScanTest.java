@@ -6,6 +6,7 @@ import io.kestra.core.models.flows.State;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.JacksonMapper;
+import io.kestra.core.utils.TestsUtils;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.StringUtils;
@@ -26,9 +27,10 @@ class ScanTest {
 
     @Test
     void run() throws Exception {
-        RunContext runContext = runContextFactory.of(ImmutableMap.of());
 
         Scan task = Scan.builder()
+            .id("unit-test")
+            .type(Scan.class.getName())
             .configuration(JacksonMapper.ofYaml().readValue(
                 "data_source kestra:\n" +
                     "  type: bigquery\n" +
@@ -46,9 +48,9 @@ class ScanTest {
                     "      fail: when > 250\n",
                 TYPE_REFERENCE
             ))
-            .requirements(List.of("soda-core-bigquery"))
             .build();
 
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());
         Scan.Output runOutput = task.run(runContext);
 
         assertThat(runOutput.getResult().getHasFailures(), is(false));
@@ -59,9 +61,9 @@ class ScanTest {
 
     @Test
     void failed() throws Exception {
-        RunContext runContext = runContextFactory.of(ImmutableMap.of());
-
         Scan task = Scan.builder()
+            .id("unit-test")
+            .type(Scan.class.getName())
             .configuration(JacksonMapper.ofYaml().readValue(
                 "data_source kestra:\n" +
                     "  type: bigquery\n" +
@@ -80,9 +82,9 @@ class ScanTest {
                     "      fail condition: regionId = 4",
                 TYPE_REFERENCE
             ))
-            .requirements(List.of("soda-core-bigquery"))
             .build();
 
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());
         Scan.Output runOutput = task.run(runContext);
 
         assertThat(runOutput.getResult().getHasFailures(), is(true));
@@ -93,9 +95,9 @@ class ScanTest {
 
     @Test
     void error() throws Exception {
-        RunContext runContext = runContextFactory.of(ImmutableMap.of());
-
         Scan task = Scan.builder()
+            .id("unit-test")
+            .type(Scan.class.getName())
             .configuration(JacksonMapper.ofYaml().readValue(
                 "data_source kestra:\n" +
                     "  type: bigquery\n" +
@@ -114,6 +116,7 @@ class ScanTest {
             .requirements(List.of("soda-core-bigquery"))
             .build();
 
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());
         Scan.Output runOutput = task.run(runContext);
 
         assertThat(runOutput.getResult().getHasFailures(), is(false));
