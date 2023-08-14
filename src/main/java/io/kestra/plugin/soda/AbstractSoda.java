@@ -38,7 +38,6 @@ import javax.validation.constraints.NotNull;
 public abstract class AbstractSoda extends Task {
     static final protected ObjectMapper MAPPER = JacksonMapper.ofYaml();
 
-    // set RunnerType to PROCESS to keep backward compatibility as the old script engine has PROCESS by default and the new DOCKER
     @Builder.Default
     @Schema(
         title = "Runner to use"
@@ -46,7 +45,7 @@ public abstract class AbstractSoda extends Task {
     @PluginProperty
     @NotNull
     @NotEmpty
-    protected RunnerType runner = RunnerType.PROCESS;
+    protected RunnerType runner = RunnerType.DOCKER;
 
     @Schema(
         title = "Docker options for the `DOCKER` runner"
@@ -80,16 +79,6 @@ public abstract class AbstractSoda extends Task {
         dynamic = true
     )
     private Object inputFiles;
-
-    @Builder.Default
-    @Schema(
-        title = "The python interpreter to use",
-        description = "Set the python interpreter path to use"
-    )
-    @PluginProperty(dynamic = true)
-    @NotNull
-    @NotEmpty
-    private final String pythonPath = "python";
 
     @Schema(
         title = "List of python dependencies to add to the python execution process",
@@ -133,8 +122,13 @@ public abstract class AbstractSoda extends Task {
         Path workingDirectory = commandsWrapper.getWorkingDirectory();
 
         List<String> commands = new ArrayList<>();
-        commands.add(this.virtualEnvCommand(runContext, workingDirectory, this.requirements));
-        commands.add("./bin/python main.py");
+        if (this.requirements != null) {
+            commands.add(this.virtualEnvCommand(runContext, workingDirectory, this.requirements));
+            commands.add("./bin/python main.py");
+        } else {
+            commands.add("python main.py");
+        }
+
 
         BashService.createInputFiles(
             runContext,
@@ -158,7 +152,7 @@ public abstract class AbstractSoda extends Task {
         List<String> renderer = new ArrayList<>();
 
         renderer.add("set -o errexit");
-        renderer.add(this.pythonPath + " -m venv --system-site-packages " + workingDirectory + " > /dev/null");
+        renderer.add("python -m venv --system-site-packages " + workingDirectory + " > /dev/null");
 
         if (requirements != null) {
             renderer.addAll(Arrays.asList(
