@@ -9,7 +9,8 @@ import io.kestra.core.models.flows.State;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
-import io.kestra.core.tasks.scripts.ScriptOutput;
+import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
+import io.kestra.plugin.scripts.exec.scripts.runners.CommandsWrapper;
 import io.kestra.plugin.soda.models.ScanResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
@@ -18,6 +19,7 @@ import lombok.experimental.SuperBuilder;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
 
@@ -27,7 +29,7 @@ import java.util.Optional;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Run a soda scan"
+    title = "Run a Soda scan"
 )
 @Plugin(
     examples = {
@@ -41,7 +43,7 @@ import java.util.Optional;
                 "      project_id: kestra-unit-test",
                 "      dataset: demo",
                 "      account_info_json: |",
-                "        { YOUR JSON SERVICE ACCOUNT KEY }",
+                "        {{ secret('GCP_CREDS') }}",
                 "checks:",
                 "  checks for orderDetail:",
                 "  - row_count > 0",
@@ -75,15 +77,15 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
     Map<String, Object> variables;
 
     @Schema(
-        title = "Enable verbose logging"
+        title = "Whether to enable verbose logging"
     )
-    @PluginProperty(dynamic = false)
+    @PluginProperty
     @Builder.Default
     Boolean verbose = false;
 
     @Override
-    protected Map<String, String> finalInputFiles(RunContext runContext) throws IOException, IllegalVariableEvaluationException {
-        Map<String, String> map = super.finalInputFiles(runContext);
+    protected Map<String, String> finalInputFiles(RunContext runContext, Path workingDirectory) throws IOException, IllegalVariableEvaluationException {
+        Map<String, String> map = super.finalInputFiles(runContext, workingDirectory);
 
         String main = "import sys\n" +
             "import json\n" +
@@ -98,8 +100,8 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
             "\n" +
             "scan = Scan()\n" +
             "scan.set_data_source_name(\"kestra\")\n" +
-            "scan.add_configuration_yaml_file(file_path=\"" + this.workingDirectory.toAbsolutePath() + "/configuration.yml\")\n" +
-            "scan.add_sodacl_yaml_file(\"" + this.workingDirectory.toAbsolutePath() + "/checks.yml\")\n" +
+            "scan.add_configuration_yaml_file(file_path=\"" + workingDirectory.toAbsolutePath() + "/configuration.yml\")\n" +
+            "scan.add_sodacl_yaml_file(\"" + workingDirectory.toAbsolutePath() + "/checks.yml\")\n" +
             "\n";
 
         if (verbose) {
@@ -113,7 +115,7 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
         main += "\n" +
             "result = scan.execute()\n" +
             "\n" +
-            "with open('" + this.workingDirectory.toAbsolutePath() + "/result.json', 'w') as out:\n" +
+            "with open('" + workingDirectory.toAbsolutePath() + "/result.json', 'w') as out:\n" +
             "    out.write(json.dumps(SodaCloud.build_scan_results(scan)))\n" +
             "\n" +
             "print('::{\"outputs\": {\"exitCode\":', result, '}}::')";
@@ -126,9 +128,10 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
 
     @Override
     public Scan.Output run(RunContext runContext) throws Exception {
-        ScriptOutput start = this.start(runContext);
+        CommandsWrapper commandsWrapper = this.start(runContext);
+        ScriptOutput start = commandsWrapper.run();
 
-        ScanResult scanResult = parseResult(runContext);
+        ScanResult scanResult = parseResult(runContext, commandsWrapper.getWorkingDirectory());
 
         return Output.builder()
             .result(scanResult)
@@ -138,9 +141,9 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
             .build();
     }
 
-    protected ScanResult parseResult(RunContext runContext) throws IOException {
+    protected ScanResult parseResult(RunContext runContext, Path workingDirectory) throws IOException {
         ScanResult scanResult = JacksonMapper.ofJson(false).readValue(
-            this.workingDirectory.resolve("result.json").toFile(),
+            workingDirectory.resolve("result.json").toFile(),
             ScanResult.class
         );
 
