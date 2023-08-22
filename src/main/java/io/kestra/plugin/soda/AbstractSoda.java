@@ -6,7 +6,7 @@ import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
-import io.kestra.core.tasks.scripts.BashService;
+import io.kestra.core.tasks.PluginUtilsService;
 import io.kestra.plugin.scripts.exec.scripts.models.DockerOptions;
 import io.kestra.plugin.scripts.exec.scripts.models.RunnerType;
 import io.kestra.plugin.scripts.exec.scripts.runners.CommandsWrapper;
@@ -107,7 +107,7 @@ public abstract class AbstractSoda extends Task {
 
 
     protected Map<String, String> finalInputFiles(RunContext runContext, Path workingDirectory) throws IOException, IllegalVariableEvaluationException {
-        Map<String, String> map = this.inputFiles != null ? new HashMap<>(BashService.transformInputFiles(runContext, this.inputFiles)) : new HashMap<>();
+        Map<String, String> map = this.inputFiles != null ? new HashMap<>(PluginUtilsService.transformInputFiles(runContext, this.inputFiles)) : new HashMap<>();
 
         map.put("configuration.yml", MAPPER.writeValueAsString(runContext.render(configuration)));
 
@@ -130,7 +130,7 @@ public abstract class AbstractSoda extends Task {
         }
 
 
-        BashService.createInputFiles(
+        PluginUtilsService.createInputFiles(
             runContext,
             workingDirectory,
             this.finalInputFiles(runContext, workingDirectory),
