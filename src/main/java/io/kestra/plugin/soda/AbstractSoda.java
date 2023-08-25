@@ -36,7 +36,8 @@ import javax.validation.constraints.NotNull;
 @Getter
 @NoArgsConstructor
 public abstract class AbstractSoda extends Task {
-    static final protected ObjectMapper MAPPER = JacksonMapper.ofYaml();
+    private static final String DEFAULT_IMAGE = "sodadata/soda-core";
+    protected static final ObjectMapper MAPPER = JacksonMapper.ofYaml();
 
     @Builder.Default
     @Schema(
@@ -48,14 +49,12 @@ public abstract class AbstractSoda extends Task {
     protected RunnerType runner = RunnerType.DOCKER;
 
     @Schema(
-        title = "Docker options for the `DOCKER` runner"
+        title = "Docker options for the `DOCKER` runner",
+        defaultValue = "{image=" + DEFAULT_IMAGE + ", pullPolicy=ALWAYS}"
     )
     @PluginProperty
     @Builder.Default
-    private DockerOptions docker = DockerOptions.builder()
-        .image("sodadata/soda-core")
-        .entryPoint(List.of())
-        .build();
+    private DockerOptions docker = DockerOptions.builder().build();
 
     @Schema(title = "Deprecated, use the `docker` property instead", deprecated = true)
     @PluginProperty
@@ -105,7 +104,6 @@ public abstract class AbstractSoda extends Task {
     @NotEmpty
     Map<String, Object> configuration;
 
-
     protected Map<String, String> finalInputFiles(RunContext runContext, Path workingDirectory) throws IOException, IllegalVariableEvaluationException {
         Map<String, String> map = this.inputFiles != null ? new HashMap<>(PluginUtilsService.transformInputFiles(runContext, this.inputFiles)) : new HashMap<>();
 
@@ -118,7 +116,7 @@ public abstract class AbstractSoda extends Task {
         CommandsWrapper commandsWrapper = new CommandsWrapper(runContext)
             .withEnv(this.getEnv())
             .withRunnerType(this.getRunner())
-            .withDockerOptions(this.getDocker());
+            .withDockerOptions(injectDefaults(this.getDocker()));
         Path workingDirectory = commandsWrapper.getWorkingDirectory();
 
         List<String> commands = new ArrayList<>();
@@ -146,6 +144,18 @@ public abstract class AbstractSoda extends Task {
         return commandsWrapper
             .addEnv(Map.of("PYTHONUNBUFFERED", "true"))
             .withCommands(commandsArgs);
+    }
+
+    private DockerOptions injectDefaults(DockerOptions original) {
+        var builder = original.toBuilder();
+        if (original.getImage() == null) {
+            builder.image(DEFAULT_IMAGE);
+        }
+        if (original.getEntryPoint() == null) {
+            builder.entryPoint(Collections.emptyList());
+        }
+
+        return builder.build();
     }
 
     private String virtualEnvCommand(RunContext runContext, Path workingDirectory, List<String> requirements) throws IllegalVariableEvaluationException {
