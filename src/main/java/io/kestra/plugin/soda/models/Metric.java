@@ -10,6 +10,6 @@ import lombok.extern.jackson.Jacksonized;
 public class Metric {
     String identity;
     String metricName;
-    Double value;
+    Object value;
 }
 

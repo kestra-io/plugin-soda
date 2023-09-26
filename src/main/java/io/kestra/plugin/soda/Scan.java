@@ -152,11 +152,20 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
             .getMetrics()
             .stream()
             .filter(metric -> metric.getValue() != null)
-            .forEach(metric -> runContext.metric(Counter.of(
-                metric.getIdentity(),
-                metric.getValue(),
-                "type", metric.getMetricName()
-            )));
+            .forEach(metric -> {
+                Double metricValue = null;
+                if (metric.getValue() instanceof Double) {
+                    metricValue = (Double) metric.getValue();
+                }
+
+                if (metricValue != null) {
+                    runContext.metric(Counter.of(
+                        metric.getIdentity(),
+                        metricValue,
+                        "type", metric.getMetricName()
+                    ));
+                }
+            });
 
         return scanResult;
     }

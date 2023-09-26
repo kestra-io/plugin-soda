@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.*;
 
 @MicronautTest
 class ScanTest {
@@ -45,7 +45,8 @@ class ScanTest {
                     "  - row_count > 0\n" +
                     "  - max(unitPrice):\n" +
                     "      warn: when between 1 and 250\n" +
-                    "      fail: when > 250\n",
+                    "      fail: when > 250\n" +
+                    "  - freshness(addedDate) > 3d\n",
                 TYPE_REFERENCE
             ))
             .build();
@@ -56,6 +57,7 @@ class ScanTest {
         assertThat(runOutput.getResult().getHasFailures(), is(false));
         assertThat(runOutput.getResult().getHasErrors(), is(false));
         assertThat(runOutput.getResult().getHasWarnings(), is(true));
+        assertThat(runOutput.getResult().getChecks(), hasSize(3));
         assertThat(runOutput.finalState().get(), is(State.Type.WARNING));
     }
 
