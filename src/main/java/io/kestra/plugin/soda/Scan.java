@@ -137,6 +137,7 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
             .result(scanResult)
             .stdOutLineCount(start.getStdOutLineCount())
             .stdErrLineCount(start.getStdOutLineCount())
+            .configuration(runContext.render(configuration))
             .exitCode((Integer) start.getVars().get("exitCode"))
             .build();
     }
@@ -183,6 +184,12 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
         )
         @NotNull
         private final int exitCode;
+
+        @Schema(
+            title = "The used configuration"
+        )
+        @NotNull
+        private Map<String, Object> configuration;
 
         @Override
         public Optional<State.Type> finalState() {
