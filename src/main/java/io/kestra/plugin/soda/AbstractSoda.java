@@ -142,7 +142,10 @@ public abstract class AbstractSoda extends Task {
         );
 
         return commandsWrapper
-            .addEnv(Map.of("PYTHONUNBUFFERED", "true"))
+            .addEnv(Map.of(
+                "PYTHONUNBUFFERED", "true",
+                "PIP_ROOT_USER_ACTION", "ignore"
+            ))
             .withCommands(commandsArgs);
     }
 
