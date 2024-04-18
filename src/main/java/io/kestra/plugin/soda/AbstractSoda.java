@@ -1,5 +1,6 @@
 package io.kestra.plugin.soda;
 
+import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -59,12 +60,11 @@ public abstract class AbstractSoda extends Task {
     @Schema(title = "Deprecated, use the `docker` property instead", deprecated = true)
     @PluginProperty
     @Deprecated
-    public DockerOptions getDockerOptions() {
-        return docker;
-    }
+    private DockerOptions dockerOptions;
 
-    @Deprecated
+    @JsonSetter
     public void setDockerOptions(DockerOptions dockerOptions) {
+        this.dockerOptions = dockerOptions;
         this.docker = dockerOptions;
     }
 
