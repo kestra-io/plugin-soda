@@ -76,8 +76,7 @@ class ScanTest {
                     "      " + StringUtils.replace(UtilsTest.serviceAccount(), "\n", "\n      "),
                 TYPE_REFERENCE
             ))
-            .checks(JacksonMapper.ofYaml().readValue("checks for orderDetail:\n" +
-                    "checks for territory:\n" +
+            .checks(JacksonMapper.ofYaml().readValue("checks for territory:\n" +
                     "  - row_count > 0\n" +
                     "  - failed rows:\n" +
                     "      name: Failed rows query test\n" +
