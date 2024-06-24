@@ -7,12 +7,15 @@ import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.models.tasks.runners.PluginUtilsService;
 import io.kestra.core.models.tasks.runners.ScriptService;
+import io.kestra.core.models.tasks.runners.TaskRunner;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.plugin.scripts.exec.scripts.models.DockerOptions;
 import io.kestra.plugin.scripts.exec.scripts.models.RunnerType;
 import io.kestra.plugin.scripts.exec.scripts.runners.CommandsWrapper;
+import io.kestra.plugin.scripts.runner.docker.Docker;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -40,22 +43,34 @@ public abstract class AbstractSoda extends Task {
     private static final String DEFAULT_IMAGE = "sodadata/soda-core";
     protected static final ObjectMapper MAPPER = JacksonMapper.ofYaml();
 
-    @Builder.Default
     @Schema(
-        title = "Runner to use"
+        title = "Runner to use",
+        description = "Deprecated, use 'taskRunner' instead"
     )
     @PluginProperty
-    @NotNull
-    @NotEmpty
-    protected RunnerType runner = RunnerType.DOCKER;
+    @Deprecated
+    protected RunnerType runner;
 
     @Schema(
-        title = "Docker options for the `DOCKER` runner",
-        defaultValue = "{image=" + DEFAULT_IMAGE + ", pullPolicy=ALWAYS}"
+        title = "Deprecated, use 'taskRunner' instead"
+    )
+    @PluginProperty
+    @Deprecated
+    private DockerOptions docker;
+
+    @Schema(
+        title = "The task runner to use.",
+        description = "Task runners are provided by plugins, each have their own properties."
     )
     @PluginProperty
     @Builder.Default
-    private DockerOptions docker = DockerOptions.builder().build();
+    @Valid
+    private TaskRunner taskRunner = Docker.INSTANCE;
+
+    @Schema(title = "The task runner container image, only used if the task runner is container-based.")
+    @PluginProperty(dynamic = true)
+    @Builder.Default
+    private String containerImage = DEFAULT_IMAGE;
 
     @Schema(title = "Deprecated, use the `docker` property instead", deprecated = true)
     @PluginProperty
@@ -116,6 +131,8 @@ public abstract class AbstractSoda extends Task {
         CommandsWrapper commandsWrapper = new CommandsWrapper(runContext)
             .withEnv(this.getEnv())
             .withRunnerType(this.getRunner())
+            .withTaskRunner(this.taskRunner)
+            .withContainerImage(this.getContainerImage())
             .withDockerOptions(injectDefaults(this.getDocker()));
         Path workingDirectory = commandsWrapper.getWorkingDirectory();
 
@@ -150,6 +167,10 @@ public abstract class AbstractSoda extends Task {
     }
 
     private DockerOptions injectDefaults(DockerOptions original) {
+        if (original == null) {
+            return null;
+        }
+
         var builder = original.toBuilder();
         if (original.getImage() == null) {
             builder.image(DEFAULT_IMAGE);
