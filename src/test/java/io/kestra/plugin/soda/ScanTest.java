@@ -8,6 +8,7 @@ import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.plugin.scripts.runner.docker.Docker;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,7 @@ class ScanTest {
         Scan task = Scan.builder()
             .id("unit-test")
             .type(Scan.class.getName())
+            .taskRunner(Docker.builder().type(Docker.class.getName()).build())
             .configuration(JacksonMapper.ofYaml().readValue(
                 "data_source kestra:\n" +
                     "  type: bigquery\n" +
@@ -66,6 +68,7 @@ class ScanTest {
         Scan task = Scan.builder()
             .id("unit-test")
             .type(Scan.class.getName())
+            .taskRunner(Docker.builder().type(Docker.class.getName()).build())
             .configuration(JacksonMapper.ofYaml().readValue(
                 "data_source kestra:\n" +
                     "  type: bigquery\n" +
@@ -99,6 +102,7 @@ class ScanTest {
         Scan task = Scan.builder()
             .id("unit-test")
             .type(Scan.class.getName())
+            .taskRunner(Docker.builder().type(Docker.class.getName()).build())
             .configuration(JacksonMapper.ofYaml().readValue(
                 "data_source kestra:\n" +
                     "  type: bigquery\n" +

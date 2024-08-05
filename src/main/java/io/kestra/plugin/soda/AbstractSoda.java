@@ -133,15 +133,16 @@ public abstract class AbstractSoda extends Task {
             .withRunnerType(this.getRunner())
             .withTaskRunner(this.taskRunner)
             .withContainerImage(this.getContainerImage())
+            .withOutputFiles(List.of("result.json"))
             .withDockerOptions(injectDefaults(this.getDocker()));
         Path workingDirectory = commandsWrapper.getWorkingDirectory();
 
         List<String> commands = new ArrayList<>();
         if (this.requirements != null) {
             commands.add(this.virtualEnvCommand(runContext, workingDirectory, this.requirements));
-            commands.add("./bin/python main.py");
+            commands.add("./bin/python {{workingDir}}/main.py");
         } else {
-            commands.add("python main.py");
+            commands.add("python {{workingDir}}/main.py");
         }
 
 
@@ -149,7 +150,7 @@ public abstract class AbstractSoda extends Task {
             runContext,
             workingDirectory,
             this.finalInputFiles(runContext, workingDirectory),
-            Collections.emptyMap()
+            this.taskRunner.additionalVars(runContext, commandsWrapper)
         );
 
         List<String> commandsArgs = ScriptService.scriptCommands(
