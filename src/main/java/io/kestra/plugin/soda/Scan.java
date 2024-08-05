@@ -100,8 +100,8 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
             "\n" +
             "scan = Scan()\n" +
             "scan.set_data_source_name(\"kestra\")\n" +
-            "scan.add_configuration_yaml_file(file_path=\"" + workingDirectory.toAbsolutePath() + "/configuration.yml\")\n" +
-            "scan.add_sodacl_yaml_file(\"" + workingDirectory.toAbsolutePath() + "/checks.yml\")\n" +
+            "scan.add_configuration_yaml_file(file_path=\"{{workingDir}}/configuration.yml\")\n" +
+            "scan.add_sodacl_yaml_file(\"{{workingDir}}/checks.yml\")\n" +
             "\n";
 
         if (verbose) {
@@ -115,7 +115,7 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
         main += "\n" +
             "result = scan.execute()\n" +
             "\n" +
-            "with open('" + workingDirectory.toAbsolutePath() + "/result.json', 'w') as out:\n" +
+            "with open('{{workingDir}}/result.json', 'w') as out:\n" +
             "    out.write(json.dumps(SodaCloud.build_scan_results(scan)))\n" +
             "\n" +
             "print('::{\"outputs\": {\"exitCode\":', result, '}}::')";
@@ -129,22 +129,22 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
     @Override
     public Scan.Output run(RunContext runContext) throws Exception {
         CommandsWrapper commandsWrapper = this.start(runContext);
-        ScriptOutput start = commandsWrapper.run();
+        ScriptOutput output = commandsWrapper.run();
 
-        ScanResult scanResult = parseResult(runContext, commandsWrapper.getWorkingDirectory());
+        ScanResult scanResult = parseResult(runContext, output);
 
         return Output.builder()
             .result(scanResult)
-            .stdOutLineCount(start.getStdOutLineCount())
-            .stdErrLineCount(start.getStdOutLineCount())
+            .stdOutLineCount(output.getStdOutLineCount())
+            .stdErrLineCount(output.getStdOutLineCount())
             .configuration(runContext.render(configuration))
-            .exitCode((Integer) start.getVars().get("exitCode"))
+            .exitCode((Integer) output.getVars().get("exitCode"))
             .build();
     }
 
-    protected ScanResult parseResult(RunContext runContext, Path workingDirectory) throws IOException {
+    protected ScanResult parseResult(RunContext runContext, ScriptOutput output) throws IOException {
         ScanResult scanResult = JacksonMapper.ofJson(false).readValue(
-            workingDirectory.resolve("result.json").toFile(),
+            runContext.storage().getFile(output.getOutputFiles().get("result.json")),
             ScanResult.class
         );
 
