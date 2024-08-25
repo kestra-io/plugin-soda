@@ -29,35 +29,42 @@ import java.util.Optional;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Run a Soda scan"
+    title = "Run a Soda scan."
 )
 @Plugin(
     examples = {
         @Example(
-            title = "Run a scan on BigQuery",
-            code = {
-                "configuration:",
-                "  data_source kestra:",
-                "    type: bigquery",
-                "    connection:",
-                "      project_id: kestra-unit-test",
-                "      dataset: demo",
-                "      account_info_json: |",
-                "        {{ secret('GCP_CREDS') }}",
-                "checks:",
-                "  checks for orderDetail:",
-                "  - row_count > 0",
-                "  - max(unitPrice):",
-                "      warn: when between 1 and 250",
-                "      fail: when > 250",
-                "  checks for territory:",
-                "  - row_count > 0",
-                "  - failed rows:",
-                "      name: Failed rows query test",
-                "      fail condition: regionId = 4",
-                "requirements:",
-                " - soda-core-bigquery"
-            }
+            title = "Run a scan on BigQuery.",
+            full = true,
+            code = """
+                   id: soda_scan
+                   namespacae: company.team
+                   
+                   tasks:
+                     - id: scan
+                       type: io.kestra.plugin.soda.Scan
+                       configuration:
+                         data_source kestra:
+                           type: bigquery
+                           connection:
+                             project_id: kestra-unit-test
+                             dataset: demo
+                             account_info_json: |
+                               {{ secret('GCP_CREDS') }}
+                       checks:
+                         checks for orderDetail:
+                           - row_count > 0
+                           - max(unitPrice):
+                               warn: when between 1 and 250
+                               fail: when > 250
+                         checks for territory:
+                           - row_count > 0
+                           - failed rows:
+                               name: Failed rows query test
+                               fail condition: regionId = 4
+                       requirements:
+                         - soda-core-bigquery
+                   """
         )
     }
 )
