@@ -3,6 +3,7 @@ package io.kestra.plugin.soda;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.ImmutableMap;
 import io.kestra.core.models.flows.State;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.JacksonMapper;
@@ -118,7 +119,7 @@ class ScanTest {
                     "  - row_count > 0",
                 TYPE_REFERENCE
             ))
-            .requirements(List.of("soda-core-bigquery"))
+            .requirements(Property.of(List.of("soda-core-bigquery")))
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());

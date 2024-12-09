@@ -6,6 +6,7 @@ import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.flows.State;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
@@ -39,7 +40,7 @@ import java.util.Optional;
             code = """
                    id: soda_scan
                    namespacae: company.team
-                   
+
                    tasks:
                      - id: scan
                        type: io.kestra.plugin.soda.Scan
@@ -80,15 +81,13 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
     @Schema(
         title = "The variables to pass"
     )
-    @PluginProperty(dynamic = true)
-    Map<String, Object> variables;
+    Property<Map<String, Object>> variables;
 
     @Schema(
         title = "Whether to enable verbose logging"
     )
-    @PluginProperty
     @Builder.Default
-    Boolean verbose = false;
+    Property<Boolean> verbose = Property.of(false);
 
     @Override
     protected Map<String, String> finalInputFiles(RunContext runContext, Path workingDirectory) throws IOException, IllegalVariableEvaluationException {
@@ -111,12 +110,12 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
             "scan.add_sodacl_yaml_file(\"{{workingDir}}/checks.yml\")\n" +
             "\n";
 
-        if (verbose) {
+        if (runContext.render(verbose).as(Boolean.class).orElseThrow()) {
             main += "scan.set_verbose()";
         }
 
         if (variables != null) {
-            main += "scan.add_variables(" + JacksonMapper.ofJson().writeValueAsString(runContext.render(variables)) + ")";
+            main += "scan.add_variables(" + JacksonMapper.ofJson().writeValueAsString(runContext.render(variables).asMap(String.class, Object.class)) + ")";
         }
 
         main += "\n" +
