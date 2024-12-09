@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.models.tasks.runners.PluginUtilsService;
 import io.kestra.core.models.tasks.runners.ScriptService;
@@ -98,18 +99,13 @@ public abstract class AbstractSoda extends Task {
         title = "List of python dependencies to add to the python execution process",
         description = "Python dependencies list to setup in the virtualenv, in the same format than requirements.txt. It must at least provides dbt."
     )
-    @PluginProperty(dynamic = true)
     @NotNull
-    protected List<String> requirements;
+    protected Property<List<String>> requirements;
 
     @Schema(
         title = "Additional environment variables for the current process."
     )
-    @PluginProperty(
-        additionalProperties = String.class,
-        dynamic = true
-    )
-    protected Map<String, String> env;
+    protected Property<Map<String, String>> env;
 
     @Schema(
         title = "The configuration file"
@@ -129,7 +125,7 @@ public abstract class AbstractSoda extends Task {
 
     public CommandsWrapper start(RunContext runContext) throws Exception {
         CommandsWrapper commandsWrapper = new CommandsWrapper(runContext)
-            .withEnv(this.getEnv())
+            .withEnv(runContext.render(this.getEnv()).asMap(String.class, String.class))
             .withRunnerType(this.getRunner())
             .withTaskRunner(this.taskRunner)
             .withContainerImage(this.getContainerImage())
@@ -139,7 +135,7 @@ public abstract class AbstractSoda extends Task {
 
         List<String> commands = new ArrayList<>();
         if (this.requirements != null) {
-            commands.add(this.virtualEnvCommand(runContext, workingDirectory, this.requirements));
+            commands.add(this.virtualEnvCommand(runContext, workingDirectory, runContext.render(this.requirements).asList(String.class)));
             commands.add("./bin/python {{workingDir}}/main.py");
         } else {
             commands.add("python {{workingDir}}/main.py");
