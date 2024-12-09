@@ -124,8 +124,9 @@ public abstract class AbstractSoda extends Task {
     }
 
     public CommandsWrapper start(RunContext runContext) throws Exception {
+        var env = runContext.render(this.getEnv()).asMap(String.class, String.class);
         CommandsWrapper commandsWrapper = new CommandsWrapper(runContext)
-            .withEnv(runContext.render(this.getEnv()).asMap(String.class, String.class))
+            .withEnv(env.isEmpty() ? new HashMap<>() : env)
             .withRunnerType(this.getRunner())
             .withTaskRunner(this.taskRunner)
             .withContainerImage(this.getContainerImage())
