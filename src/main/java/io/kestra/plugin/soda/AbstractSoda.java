@@ -99,7 +99,6 @@ public abstract class AbstractSoda extends Task {
         title = "List of python dependencies to add to the python execution process",
         description = "Python dependencies list to setup in the virtualenv, in the same format than requirements.txt. It must at least provides dbt."
     )
-    @NotNull
     protected Property<List<String>> requirements;
 
     @Schema(
