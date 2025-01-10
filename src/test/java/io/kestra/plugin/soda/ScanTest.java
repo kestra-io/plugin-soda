@@ -34,7 +34,7 @@ class ScanTest {
             .id("unit-test")
             .type(Scan.class.getName())
             .taskRunner(Docker.builder().type(Docker.class.getName()).build())
-            .configuration(JacksonMapper.ofYaml().readValue(
+            .configuration(Property.of(JacksonMapper.ofYaml().readValue(
                 "data_source kestra:\n" +
                     "  type: bigquery\n" +
                     "  connection:\n" +
@@ -43,7 +43,7 @@ class ScanTest {
                     "    account_info_json: |\n" +
                     "      " + StringUtils.replace(UtilsTest.serviceAccount(), "\n", "\n      "),
                 TYPE_REFERENCE
-            ))
+            )))
             .checks(JacksonMapper.ofYaml().readValue("checks for orderDetail:\n" +
                     "  - row_count > 0\n" +
                     "  - max(unitPrice):\n" +
@@ -70,7 +70,7 @@ class ScanTest {
             .id("unit-test")
             .type(Scan.class.getName())
             .taskRunner(Docker.builder().type(Docker.class.getName()).build())
-            .configuration(JacksonMapper.ofYaml().readValue(
+            .configuration(Property.of(JacksonMapper.ofYaml().readValue(
                 "data_source kestra:\n" +
                     "  type: bigquery\n" +
                     "  connection:\n" +
@@ -79,7 +79,7 @@ class ScanTest {
                     "    account_info_json: |\n" +
                     "      " + StringUtils.replace(UtilsTest.serviceAccount(), "\n", "\n      "),
                 TYPE_REFERENCE
-            ))
+            )))
             .checks(JacksonMapper.ofYaml().readValue("checks for territory:\n" +
                     "  - row_count > 0\n" +
                     "  - failed rows:\n" +
@@ -104,7 +104,7 @@ class ScanTest {
             .id("unit-test")
             .type(Scan.class.getName())
             .taskRunner(Docker.builder().type(Docker.class.getName()).build())
-            .configuration(JacksonMapper.ofYaml().readValue(
+            .configuration(Property.of(JacksonMapper.ofYaml().readValue(
                 "data_source kestra:\n" +
                     "  type: bigquery\n" +
                     "  connection:\n" +
@@ -113,7 +113,7 @@ class ScanTest {
                     "    account_info_json: |\n" +
                     "      " + StringUtils.replace(UtilsTest.serviceAccount(), "\n", "\n      "),
                 TYPE_REFERENCE
-            ))
+            )))
             .checks(JacksonMapper.ofYaml().readValue("checks for orderDetail:\n" +
                     "checks for invalid_table:\n" +
                     "  - row_count > 0",

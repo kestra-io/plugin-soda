@@ -143,7 +143,7 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
             .result(scanResult)
             .stdOutLineCount(output.getStdOutLineCount())
             .stdErrLineCount(output.getStdOutLineCount())
-            .configuration(runContext.render(configuration))
+            .configuration(runContext.render(configuration).asMap(String.class, Object.class))
             .exitCode((Integer) output.getVars().get("exitCode"))
             .build();
     }
