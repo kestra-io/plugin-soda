@@ -48,9 +48,8 @@ public abstract class AbstractSoda extends Task {
         title = "Runner to use",
         description = "Deprecated, use 'taskRunner' instead"
     )
-    @PluginProperty
     @Deprecated
-    protected RunnerType runner;
+    protected Property<RunnerType> runner;
 
     @Schema(
         title = "Deprecated, use 'taskRunner' instead"
@@ -69,9 +68,8 @@ public abstract class AbstractSoda extends Task {
     private TaskRunner<?> taskRunner = Docker.instance();
 
     @Schema(title = "The task runner container image, only used if the task runner is container-based.")
-    @PluginProperty(dynamic = true)
     @Builder.Default
-    private String containerImage = DEFAULT_IMAGE;
+    private Property<String> containerImage = Property.of(DEFAULT_IMAGE);
 
     @Schema(title = "Deprecated, use the `docker` property instead", deprecated = true)
     @PluginProperty
@@ -99,7 +97,6 @@ public abstract class AbstractSoda extends Task {
         title = "List of python dependencies to add to the python execution process",
         description = "Python dependencies list to setup in the virtualenv, in the same format than requirements.txt. It must at least provides dbt."
     )
-    @NotNull
     protected Property<List<String>> requirements;
 
     @Schema(
@@ -110,15 +107,16 @@ public abstract class AbstractSoda extends Task {
     @Schema(
         title = "The configuration file"
     )
-    @PluginProperty(dynamic = true)
     @NotNull
-    @NotEmpty
-    Map<String, Object> configuration;
+    Property<@NotEmpty Map<String, Object>> configuration;
 
     protected Map<String, String> finalInputFiles(RunContext runContext, Path workingDirectory) throws IOException, IllegalVariableEvaluationException {
         Map<String, String> map = this.inputFiles != null ? new HashMap<>(PluginUtilsService.transformInputFiles(runContext, this.inputFiles)) : new HashMap<>();
 
-        map.put("configuration.yml", MAPPER.writeValueAsString(runContext.render(configuration)));
+        var renderedConfig = runContext.render(configuration).asMap(String.class, Object.class);
+        if (!renderedConfig.isEmpty()) {
+            map.put("configuration.yml", MAPPER.writeValueAsString(renderedConfig));
+        }
 
         return map;
     }
@@ -127,9 +125,9 @@ public abstract class AbstractSoda extends Task {
         var env = runContext.render(this.getEnv()).asMap(String.class, String.class);
         CommandsWrapper commandsWrapper = new CommandsWrapper(runContext)
             .withEnv(env.isEmpty() ? new HashMap<>() : env)
-            .withRunnerType(this.getRunner())
+            .withRunnerType(runContext.render(this.getRunner()).as(RunnerType.class).orElse(null))
             .withTaskRunner(this.taskRunner)
-            .withContainerImage(this.getContainerImage())
+            .withContainerImage(runContext.render(this.getContainerImage()).as(String.class).orElse(null))
             .withOutputFiles(List.of("result.json"))
             .withDockerOptions(injectDefaults(this.getDocker()));
         Path workingDirectory = commandsWrapper.getWorkingDirectory();
