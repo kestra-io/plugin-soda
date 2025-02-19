@@ -148,18 +148,13 @@ public abstract class AbstractSoda extends Task {
             this.taskRunner.additionalVars(runContext, commandsWrapper)
         );
 
-        List<String> commandsArgs = ScriptService.scriptCommands(
-            List.of("/bin/sh", "-c"),
-            null,
-            commands
-        );
-
         return commandsWrapper
             .addEnv(Map.of(
                 "PYTHONUNBUFFERED", "true",
                 "PIP_ROOT_USER_ACTION", "ignore"
             ))
-            .withCommands(commandsArgs);
+            .withInterpreter(Property.of(List.of("/bin/sh", "-c")))
+            .withCommands(new Property<>(JacksonMapper.ofJson().writeValueAsString(commands)));
     }
 
     private DockerOptions injectDefaults(DockerOptions original) {
