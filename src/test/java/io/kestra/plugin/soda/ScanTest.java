@@ -34,7 +34,7 @@ class ScanTest {
             .id("unit-test")
             .type(Scan.class.getName())
             .taskRunner(Docker.builder().type(Docker.class.getName()).build())
-            .configuration(Property.of(JacksonMapper.ofYaml().readValue(
+            .configuration(Property.ofValue(JacksonMapper.ofYaml().readValue(
                 "data_source kestra:\n" +
                     "  type: bigquery\n" +
                     "  connection:\n" +
@@ -70,7 +70,7 @@ class ScanTest {
             .id("unit-test")
             .type(Scan.class.getName())
             .taskRunner(Docker.builder().type(Docker.class.getName()).build())
-            .configuration(Property.of(JacksonMapper.ofYaml().readValue(
+            .configuration(Property.ofValue(JacksonMapper.ofYaml().readValue(
                 "data_source kestra:\n" +
                     "  type: bigquery\n" +
                     "  connection:\n" +
@@ -104,7 +104,7 @@ class ScanTest {
             .id("unit-test")
             .type(Scan.class.getName())
             .taskRunner(Docker.builder().type(Docker.class.getName()).build())
-            .configuration(Property.of(JacksonMapper.ofYaml().readValue(
+            .configuration(Property.ofValue(JacksonMapper.ofYaml().readValue(
                 "data_source kestra:\n" +
                     "  type: bigquery\n" +
                     "  connection:\n" +
@@ -119,7 +119,7 @@ class ScanTest {
                     "  - row_count > 0",
                 TYPE_REFERENCE
             ))
-            .requirements(Property.of(List.of("soda-core-bigquery")))
+            .requirements(Property.ofValue(List.of("soda-core-bigquery")))
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());
