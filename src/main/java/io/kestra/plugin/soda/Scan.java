@@ -87,7 +87,7 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
         title = "Whether to enable verbose logging"
     )
     @Builder.Default
-    Property<Boolean> verbose = Property.of(false);
+    Property<Boolean> verbose = Property.ofValue(false);
 
     @Override
     protected Map<String, String> finalInputFiles(RunContext runContext, Path workingDirectory) throws IOException, IllegalVariableEvaluationException {
