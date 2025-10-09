@@ -108,7 +108,7 @@ public abstract class AbstractSoda extends Task {
         title = "The configuration file"
     )
     @NotNull
-    Property<@NotEmpty Map<String, Object>> configuration;
+    Property<Map<String, Object>> configuration;
 
     protected Map<String, String> finalInputFiles(RunContext runContext, Path workingDirectory) throws IOException, IllegalVariableEvaluationException {
         Map<String, String> map = this.inputFiles != null ? new HashMap<>(PluginUtilsService.transformInputFiles(runContext, this.inputFiles)) : new HashMap<>();
