@@ -39,7 +39,7 @@ class ScanTest {
                     "  type: bigquery\n" +
                     "  connection:\n" +
                     "    project_id: \"kestra-unit-test\"\n" +
-                    "    dataset: demo\n" +
+                    "    dataset: kestra_unit_test\n" +
                     "    account_info_json: |\n" +
                     "      " + StringUtils.replace(UtilsTest.serviceAccount(), "\n", "\n      "),
                 TYPE_REFERENCE
@@ -75,7 +75,7 @@ class ScanTest {
                     "  type: bigquery\n" +
                     "  connection:\n" +
                     "    project_id: \"kestra-unit-test\"\n" +
-                    "    dataset: demo\n" +
+                    "    dataset: kestra_unit_test\n" +
                     "    account_info_json: |\n" +
                     "      " + StringUtils.replace(UtilsTest.serviceAccount(), "\n", "\n      "),
                 TYPE_REFERENCE
@@ -109,7 +109,7 @@ class ScanTest {
                     "  type: bigquery\n" +
                     "  connection:\n" +
                     "    project_id: \"kestra-unit-test\"\n" +
-                    "    dataset: demo\n" +
+                    "    dataset: kestra_unit_test\n" +
                     "    account_info_json: |\n" +
                     "      " + StringUtils.replace(UtilsTest.serviceAccount(), "\n", "\n      "),
                 TYPE_REFERENCE
