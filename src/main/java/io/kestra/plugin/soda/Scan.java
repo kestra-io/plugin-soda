@@ -50,7 +50,7 @@ import java.util.Optional;
                         type: bigquery
                         connection:
                           project_id: kestra-unit-test
-                          dataset: demo
+                          dataset: kestra_unit_test
                           account_info_json: |
                             {{ secret('GCP_CREDS') }}
                     checks:
