@@ -1,0 +1,8 @@
+group: io.kestra.plugin.soda
+name: "soda"
+title: "Soda"
+description: "This sub-group of plugins contains tasks for using Soda. Soda allows everyone on your data team to find, analyze, and resolve data issues."
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
