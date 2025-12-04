@@ -1,8 +1,8 @@
 group: io.kestra.plugin.soda
 name: "soda"
 title: "Soda"
-description: "This sub-group of plugins contains tasks for using Soda. Soda allows everyone on your data team to find, analyze, and resolve data issues."
-body: ""
+description: "Tasks that run Soda scans for data quality checks."
+body: "Provide Soda configuration and `checks` YAML along with any required connectors or variables to execute scans via the Soda CLI container, emitting check metrics and results files you can inspect or fail pipelines on."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"
