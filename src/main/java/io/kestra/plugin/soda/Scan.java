@@ -31,13 +31,14 @@ import java.util.Optional;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Run a Soda scan."
+    title = "Run Soda scan and report results",
+    description = "Executes SodaCL checks with the provided configuration, writes scan results to internal storage, and emits metrics to Kestra. Uses the soda-core container by default, runs non-verbose unless `verbose` is true, and requires both configuration and checks to be supplied."
 )
-@Plugin(
-    examples = {
-        @Example(
-            title = "Run a scan on BigQuery.",
-            full = true,
+    @Plugin(
+        examples = {
+            @Example(
+                title = "Run a scan on BigQuery.",
+                full = true,
             code = """
                 id: soda_scan
                 namespace: company.team
@@ -67,12 +68,44 @@ import java.util.Optional;
                     requirements:
                       - soda-core-bigquery
                 """
-        )
-    }
-)
+        ),
+            @Example(
+                title = "Scan PostgreSQL with variables and verbose output",
+                full = true,
+                code = """
+                    id: soda_scan_postgres
+                    namespace: company.team
+
+                    tasks:
+                      - id: scan_pg
+                        type: io.kestra.plugin.soda.Scan
+                        configuration:
+                          data_source kestra:
+                            type: postgres
+                            connection:
+                              host: localhost
+                              port: 5432
+                              database: app
+                              username: kestra
+                              password: {{ secret('PG_PASSWORD') }}
+                        checks:
+                          checks for users:
+                            - row_count > 0
+                            - missing_count(email) = 0
+                        variables:
+                          env: staging
+                          threshold: 1000
+                        verbose: true
+                        requirements:
+                          - soda-core-postgres
+                    """
+            )
+        }
+    )
 public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
     @Schema(
-        title = "The checks file"
+        title = "SodaCL checks definition",
+        description = "Required map rendered to `checks.yml` and executed against the `kestra` data source. Follow SodaCL syntax; failing checks mark the task accordingly."
     )
     @PluginProperty(dynamic = true)
     @NotNull
@@ -80,12 +113,14 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
     Map<String, Object> checks;
 
     @Schema(
-        title = "The variables to pass"
+        title = "Runtime variables",
+        description = "Optional variables injected into the Soda scan for templating checks or configuration; values are rendered by Kestra before execution."
     )
     Property<Map<String, Object>> variables;
 
     @Schema(
-        title = "Whether to enable verbose logging"
+        title = "Enable verbose logging",
+        description = "Defaults to false; when true, the Soda scan runs with verbose output."
     )
     @Builder.Default
     Property<Boolean> verbose = Property.ofValue(false);
@@ -181,28 +216,33 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "The scan result"
+            title = "Scan results payload",
+            description = "Parsed Soda scan outcome including warnings, failures, and emitted metrics."
         )
         private final ScanResult result;
 
         @Schema(
-            title = "The standard output line count"
+            title = "Standard output line count",
+            description = "Number of lines captured from stdout during the scan execution."
         )
         private final int stdOutLineCount;
 
         @Schema(
-            title = "The standard error line count"
+            title = "Standard error line count",
+            description = "Number of lines captured from stderr during the scan execution."
         )
         private final int stdErrLineCount;
 
         @Schema(
-            title = "The exit code of the whole execution"
+            title = "Scan process exit code",
+            description = "Exit code returned by the underlying Soda command (0 for success, non-zero on failure)."
         )
         @NotNull
         private final int exitCode;
 
         @Schema(
-            title = "The used configuration"
+            title = "Rendered configuration",
+            description = "Configuration map applied to the Soda scan, as rendered by Kestra expressions."
         )
         @NotNull
         private Map<String, Object> configuration;
