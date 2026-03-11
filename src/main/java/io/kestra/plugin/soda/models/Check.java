@@ -1,12 +1,10 @@
 package io.kestra.plugin.soda.models;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
+
 import lombok.Value;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.jackson.Jacksonized;
-
-import java.util.List;
-import java.util.Map;
 
 @Value
 @Jacksonized
@@ -24,4 +22,3 @@ public class Check {
     CheckOutcome outcome;
     // String diagnostics;
 }
-

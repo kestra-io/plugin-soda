@@ -1,15 +1,11 @@
 package io.kestra.plugin.soda.models;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import io.kestra.core.models.flows.State;
+import java.time.ZonedDateTime;
+import java.util.List;
+
 import lombok.Value;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.jackson.Jacksonized;
-
-import java.time.Instant;
-import java.time.ZonedDateTime;
-import java.util.List;
-import java.util.Map;
 
 @Value
 @Jacksonized
@@ -30,4 +26,3 @@ public class ScanResult {
     List<String> metadata;
     // List<Log> logs;
 }
-

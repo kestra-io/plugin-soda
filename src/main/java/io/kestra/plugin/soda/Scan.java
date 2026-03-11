@@ -1,5 +1,10 @@
 package io.kestra.plugin.soda;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Map;
+import java.util.Optional;
+
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
@@ -13,17 +18,12 @@ import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 import io.kestra.plugin.scripts.exec.scripts.runners.CommandsWrapper;
 import io.kestra.plugin.soda.models.ScanResult;
-import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.*;
-import lombok.experimental.SuperBuilder;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.Map;
-import java.util.Optional;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 @SuperBuilder
 @ToString
@@ -34,11 +34,11 @@ import java.util.Optional;
     title = "Run Soda scan and report results",
     description = "Executes SodaCL checks with the provided configuration, writes scan results to internal storage, and emits metrics to Kestra. Uses the soda-core container by default, runs non-verbose unless `verbose` is true, and requires both configuration and checks to be supplied."
 )
-    @Plugin(
-        examples = {
-            @Example(
-                title = "Run a scan on BigQuery.",
-                full = true,
+@Plugin(
+    examples = {
+        @Example(
+            title = "Run a scan on BigQuery.",
+            full = true,
             code = """
                 id: soda_scan
                 namespace: company.team
@@ -69,39 +69,39 @@ import java.util.Optional;
                       - soda-core-bigquery
                 """
         ),
-            @Example(
-                title = "Scan PostgreSQL with variables and verbose output",
-                full = true,
-                code = """
-                    id: soda_scan_postgres
-                    namespace: company.team
+        @Example(
+            title = "Scan PostgreSQL with variables and verbose output",
+            full = true,
+            code = """
+                id: soda_scan_postgres
+                namespace: company.team
 
-                    tasks:
-                      - id: scan_pg
-                        type: io.kestra.plugin.soda.Scan
-                        configuration:
-                          data_source kestra:
-                            type: postgres
-                            connection:
-                              host: localhost
-                              port: 5432
-                              database: app
-                              username: kestra
-                              password: {{ secret('PG_PASSWORD') }}
-                        checks:
-                          checks for users:
-                            - row_count > 0
-                            - missing_count(email) = 0
-                        variables:
-                          env: staging
-                          threshold: 1000
-                        verbose: true
-                        requirements:
-                          - soda-core-postgres
-                    """
-            )
-        }
-    )
+                tasks:
+                  - id: scan_pg
+                    type: io.kestra.plugin.soda.Scan
+                    configuration:
+                      data_source kestra:
+                        type: postgres
+                        connection:
+                          host: localhost
+                          port: 5432
+                          database: app
+                          username: kestra
+                          password: {{ secret('PG_PASSWORD') }}
+                    checks:
+                      checks for users:
+                        - row_count > 0
+                        - missing_count(email) = 0
+                    variables:
+                      env: staging
+                      threshold: 1000
+                    verbose: true
+                    requirements:
+                      - soda-core-postgres
+                """
+        )
+    }
+)
 public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
     @Schema(
         title = "SodaCL checks definition",
@@ -194,18 +194,21 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
             .getMetrics()
             .stream()
             .filter(metric -> metric.getValue() != null)
-            .forEach(metric -> {
+            .forEach(metric ->
+            {
                 Double metricValue = null;
                 if (metric.getValue() instanceof Double) {
                     metricValue = (Double) metric.getValue();
                 }
 
                 if (metricValue != null) {
-                    runContext.metric(Counter.of(
-                        metric.getIdentity(),
-                        metricValue,
-                        "type", metric.getMetricName()
-                    ));
+                    runContext.metric(
+                        Counter.of(
+                            metric.getIdentity(),
+                            metricValue,
+                            "type", metric.getMetricName()
+                        )
+                    );
                 }
             });
 
@@ -249,8 +252,8 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
 
         @Override
         public Optional<State.Type> finalState() {
-            return Optional.of(this.result.getHasWarnings() ? State.Type.WARNING :
-                (this.result.getHasFailures() || this.result.getHasErrors() ? State.Type.FAILED : State.Type.SUCCESS)
+            return Optional.of(
+                this.result.getHasWarnings() ? State.Type.WARNING : (this.result.getHasFailures() || this.result.getHasErrors() ? State.Type.FAILED : State.Type.SUCCESS)
             );
         }
     }

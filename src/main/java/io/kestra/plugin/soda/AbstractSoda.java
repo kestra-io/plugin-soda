@@ -1,29 +1,5 @@
 package io.kestra.plugin.soda;
 
-import com.fasterxml.jackson.annotation.JsonSetter;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
-import io.kestra.core.models.annotations.PluginProperty;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.models.tasks.Task;
-import io.kestra.core.models.tasks.runners.PluginUtilsService;
-import io.kestra.core.models.tasks.runners.ScriptService;
-import io.kestra.core.models.tasks.runners.TaskRunner;
-import io.kestra.core.runners.RunContext;
-import io.kestra.core.serializers.JacksonMapper;
-import io.kestra.plugin.scripts.exec.scripts.models.DockerOptions;
-import io.kestra.plugin.scripts.exec.scripts.models.RunnerType;
-import io.kestra.plugin.scripts.exec.scripts.runners.CommandsWrapper;
-import io.kestra.plugin.scripts.runner.docker.Docker;
-import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.Valid;
-import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
-import lombok.experimental.SuperBuilder;
-
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -32,8 +8,32 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import jakarta.validation.constraints.NotEmpty;
+
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.models.tasks.Task;
+import io.kestra.core.models.tasks.runners.PluginUtilsService;
+import io.kestra.core.models.tasks.runners.TaskRunner;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.JacksonMapper;
+import io.kestra.plugin.scripts.exec.scripts.models.DockerOptions;
+import io.kestra.plugin.scripts.exec.scripts.models.RunnerType;
+import io.kestra.plugin.scripts.exec.scripts.runners.CommandsWrapper;
+import io.kestra.plugin.scripts.runner.docker.Docker;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 
 @SuperBuilder
 @ToString
@@ -140,7 +140,6 @@ public abstract class AbstractSoda extends Task {
             commands.add("python {{workingDir}}/main.py");
         }
 
-
         PluginUtilsService.createInputFiles(
             runContext,
             workingDirectory,
@@ -149,10 +148,12 @@ public abstract class AbstractSoda extends Task {
         );
 
         return commandsWrapper
-            .addEnv(Map.of(
-                "PYTHONUNBUFFERED", "true",
-                "PIP_ROOT_USER_ACTION", "ignore"
-            ))
+            .addEnv(
+                Map.of(
+                    "PYTHONUNBUFFERED", "true",
+                    "PIP_ROOT_USER_ACTION", "ignore"
+                )
+            )
             .withInterpreter(Property.ofValue(List.of("/bin/sh", "-c")))
             .withCommands(new Property<>(JacksonMapper.ofJson().writeValueAsString(commands)));
     }
@@ -180,9 +181,12 @@ public abstract class AbstractSoda extends Task {
         renderer.add("python -m venv --system-site-packages " + workingDirectory + " > /dev/null");
 
         if (requirements != null) {
-            renderer.addAll(Arrays.asList(
-                "./bin/pip install pip --upgrade > /dev/null",
-                "./bin/pip install " + runContext.render(String.join(" ", requirements)) + " > /dev/null"));
+            renderer.addAll(
+                Arrays.asList(
+                    "./bin/pip install pip --upgrade > /dev/null",
+                    "./bin/pip install " + runContext.render(String.join(" ", requirements)) + " > /dev/null"
+                )
+            );
         }
 
         return String.join("\n", renderer);

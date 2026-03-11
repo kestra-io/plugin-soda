@@ -12,4 +12,3 @@ public class Metric {
     String metricName;
     Object value;
 }
-

@@ -1,11 +1,10 @@
 package io.kestra.plugin.soda.models;
 
+import java.time.ZonedDateTime;
+
 import lombok.Value;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.jackson.Jacksonized;
-
-import java.time.ZonedDateTime;
-import java.util.List;
 
 @Value
 @Jacksonized
@@ -16,4 +15,3 @@ public class Log {
     ZonedDateTime timestamp;
     Integer index;
 }
-
