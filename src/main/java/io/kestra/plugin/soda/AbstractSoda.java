@@ -155,7 +155,7 @@ public abstract class AbstractSoda extends Task {
                 )
             )
             .withInterpreter(Property.ofValue(List.of("/bin/sh", "-c")))
-            .withCommands(Property.ofValue(commands));
+            .withCommands(Property.ofExpression(JacksonMapper.ofJson().writeValueAsString(commands)));
     }
 
     private DockerOptions injectDefaults(DockerOptions original) {
