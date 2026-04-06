@@ -49,12 +49,13 @@ public abstract class AbstractSoda extends Task {
         description = "Deprecated, use 'taskRunner' instead"
     )
     @Deprecated
+    @PluginProperty(group = "execution")
     protected Property<RunnerType> runner;
 
     @Schema(
         title = "Deprecated, use 'taskRunner' instead"
     )
-    @PluginProperty
+    @PluginProperty(group = "execution")
     @Deprecated
     private DockerOptions docker;
 
@@ -62,17 +63,18 @@ public abstract class AbstractSoda extends Task {
         title = "The task runner to use.",
         description = "Task runners are provided by plugins, each have their own properties."
     )
-    @PluginProperty
+    @PluginProperty(group = "execution")
     @Builder.Default
     @Valid
     private TaskRunner<?> taskRunner = Docker.instance();
 
     @Schema(title = "The task runner container image, only used if the task runner is container-based.")
     @Builder.Default
+    @PluginProperty(group = "execution")
     private Property<String> containerImage = Property.ofValue(DEFAULT_IMAGE);
 
     @Schema(title = "Deprecated, use the `docker` property instead", deprecated = true)
-    @PluginProperty
+    @PluginProperty(group = "advanced")
     @Deprecated
     private DockerOptions dockerOptions;
 
@@ -87,7 +89,7 @@ public abstract class AbstractSoda extends Task {
         description = "You can define the files as map or a JSON string. " +
             "Each file can be defined inlined or can reference a file from Kestra's internal storage."
     )
-    @PluginProperty(
+    @PluginProperty(group = "source", 
         additionalProperties = String.class,
         dynamic = true
     )
@@ -97,11 +99,13 @@ public abstract class AbstractSoda extends Task {
         title = "List of python dependencies to add to the python execution process",
         description = "Python dependencies list to setup in the virtualenv, in the same format than requirements.txt. It must at least provides dbt."
     )
+    @PluginProperty(group = "advanced")
     protected Property<List<String>> requirements;
 
     @Schema(
         title = "Additional environment variables for the current process."
     )
+    @PluginProperty(group = "execution")
     protected Property<Map<String, String>> env;
 
     @Schema(
