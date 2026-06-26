@@ -13,7 +13,7 @@ gcloud config set project "${PROJECT_ID}" >/dev/null
 echo "📋 Creating test tables in existing dataset ${PROJECT_ID}:${DATASET}..."
 
 # orderDetail table: used in 'run' and 'error' tests
-bq query --use_legacy_sql=false "
+bq query --project_id="${PROJECT_ID}" --use_legacy_sql=false "
 CREATE OR REPLACE TABLE \`${PROJECT_ID}.${DATASET}.orderDetail\` AS
 SELECT 1 AS id, 10.5 AS unitPrice, TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY) AS addedDate
 UNION ALL
@@ -21,7 +21,7 @@ SELECT 2 AS id, 200.0 AS unitPrice, TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 
 "
 
 # territory table: used in 'failed' test
-bq query --use_legacy_sql=false "
+bq query --project_id="${PROJECT_ID}" --use_legacy_sql=false "
 CREATE OR REPLACE TABLE \`${PROJECT_ID}.${DATASET}.territory\` AS
 SELECT 1 AS id, 'North' AS name, 1 AS regionId
 UNION ALL
