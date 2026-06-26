@@ -60,7 +60,7 @@ public abstract class AbstractSoda extends Task {
     private DockerOptions docker;
 
     @Schema(
-        title = "The task runner to use.",
+        title = "The task runner to use",
         description = "Task runners are provided by plugins, each have their own properties."
     )
     @PluginProperty(group = "execution")
@@ -68,7 +68,7 @@ public abstract class AbstractSoda extends Task {
     @Valid
     private TaskRunner<?> taskRunner = Docker.instance();
 
-    @Schema(title = "The task runner container image, only used if the task runner is container-based.")
+    @Schema(title = "The task runner container image, only used if the task runner is container-based")
     @Builder.Default
     @PluginProperty(group = "execution")
     private Property<String> containerImage = Property.ofValue(DEFAULT_IMAGE);
@@ -85,7 +85,7 @@ public abstract class AbstractSoda extends Task {
     }
 
     @Schema(
-        title = "Input files are extra files that will be available in the dbt working directory.",
+        title = "Input files are extra files that will be available in the dbt working directory",
         description = "You can define the files as map or a JSON string. " +
             "Each file can be defined inlined or can reference a file from Kestra's internal storage."
     )
@@ -103,7 +103,7 @@ public abstract class AbstractSoda extends Task {
     protected Property<List<String>> requirements;
 
     @Schema(
-        title = "Additional environment variables for the current process."
+        title = "Additional environment variables for the current process"
     )
     @PluginProperty(group = "execution")
     protected Property<Map<String, String>> env;
