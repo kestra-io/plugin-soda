@@ -107,7 +107,7 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
         title = "SodaCL checks definition",
         description = "Required map rendered to `checks.yml` and executed against the `kestra` data source. Follow SodaCL syntax; failing checks mark the task accordingly."
     )
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "main")
     @NotNull
     @NotEmpty
     Map<String, Object> checks;
