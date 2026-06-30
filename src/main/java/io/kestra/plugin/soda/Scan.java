@@ -2,8 +2,10 @@ package io.kestra.plugin.soda;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
@@ -103,6 +105,21 @@ import lombok.experimental.SuperBuilder;
     }
 )
 public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
+    private static final String REDACTED = "******";
+
+    private static final Set<String> SENSITIVE_KEY_PATTERNS = Set.of(
+        "password", "passwd", "pwd",
+        "secret",
+        "token",
+        "key",
+        "credential", "credentials",
+        "account_info_json",
+        "private_key",
+        "api_key", "apikey",
+        "access_key",
+        "auth"
+    );
+
     @Schema(
         title = "SodaCL checks definition",
         description = "Required map rendered to `checks.yml` and executed against the `kestra` data source. Follow SodaCL syntax; failing checks mark the task accordingly."
@@ -179,9 +196,49 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
             .result(scanResult)
             .stdOutLineCount(output.getStdOutLineCount())
             .stdErrLineCount(output.getStdOutLineCount())
-            .configuration(runContext.render(configuration).asMap(String.class, Object.class))
+            .configuration(scrubSensitiveValues(runContext.render(configuration).asMap(String.class, Object.class)))
             .exitCode((Integer) output.getVars().get("exitCode"))
             .build();
+    }
+
+    /**
+     * Recursively scrubs sensitive leaf values (passwords, tokens, keys, credentials, etc.) from a
+     * rendered configuration map before it is stored in task Output, which is persisted in execution
+     * state and visible to any user with read access to the execution.
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> scrubSensitiveValues(Map<String, Object> map) {
+        Map<String, Object> scrubbed = new LinkedHashMap<>();
+
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+
+            if (isSensitiveKey(key)) {
+                scrubbed.put(key, REDACTED);
+            } else if (value instanceof Map) {
+                scrubbed.put(key, scrubSensitiveValues((Map<String, Object>) value));
+            } else {
+                scrubbed.put(key, value);
+            }
+        }
+
+        return scrubbed;
+    }
+
+    private static boolean isSensitiveKey(String key) {
+        if (key == null) {
+            return false;
+        }
+
+        String normalized = key.toLowerCase().replaceAll("[^a-z0-9]", "");
+        for (String pattern : SENSITIVE_KEY_PATTERNS) {
+            if (normalized.contains(pattern.replaceAll("[^a-z0-9]", ""))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected ScanResult parseResult(RunContext runContext, ScriptOutput output) throws IOException {

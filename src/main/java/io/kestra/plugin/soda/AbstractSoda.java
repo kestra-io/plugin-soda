@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -43,6 +44,7 @@ import lombok.experimental.SuperBuilder;
 public abstract class AbstractSoda extends Task {
     private static final String DEFAULT_IMAGE = "sodadata/soda-core";
     protected static final ObjectMapper MAPPER = JacksonMapper.ofYaml();
+    private static final Pattern SAFE_REQUIREMENT_PATTERN = Pattern.compile("^[a-zA-Z0-9_\\-.\\[\\]>=<,!~ ]+$");
 
     @Schema(
         title = "Runner to use",
@@ -185,10 +187,20 @@ public abstract class AbstractSoda extends Task {
         renderer.add("python -m venv --system-site-packages " + workingDirectory + " > /dev/null");
 
         if (requirements != null) {
+            for (String requirement : requirements) {
+                if (!SAFE_REQUIREMENT_PATTERN.matcher(requirement).matches()) {
+                    throw new IllegalArgumentException(
+                        "Invalid requirement '" + requirement + "': requirements must only contain " +
+                            "alphanumeric characters and the following symbols: _ - . [ ] > = < , ! ~ and space. " +
+                            "Shell metacharacters are not allowed."
+                    );
+                }
+            }
+
             renderer.addAll(
                 Arrays.asList(
                     "./bin/pip install pip --upgrade > /dev/null",
-                    "./bin/pip install " + runContext.render(String.join(" ", requirements)) + " > /dev/null"
+                    "./bin/pip install " + String.join(" ", requirements) + " > /dev/null"
                 )
             );
         }
