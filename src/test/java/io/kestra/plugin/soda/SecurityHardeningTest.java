@@ -1,7 +1,9 @@
 package io.kestra.plugin.soda;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -104,15 +106,60 @@ class SecurityHardeningTest {
     void scrub_redactsSecretKeyVariants() throws Exception {
         Map<String, Object> input = new LinkedHashMap<>();
         input.put("api_key", "abc");
+        input.put("apiKey", "abc");
         input.put("token", "xyz");
         input.put("account_info_json", "{...}");
+        input.put("client_secret", "shh");
         input.put("type", "postgres");
 
         Map<String, Object> result = scrub(input);
 
         assertThat(result.get("api_key"), is("******"));
+        assertThat(result.get("apiKey"), is("******"));
         assertThat(result.get("token"), is("******"));
         assertThat(result.get("account_info_json"), is("******"));
+        assertThat(result.get("client_secret"), is("******"));
         assertThat(result.get("type"), is("postgres"));
+    }
+
+    @Test
+    void scrub_recursesIntoLists() throws Exception {
+        // A non-sensitive key whose value is a list of maps: secrets nested in list elements
+        // must still be redacted (the recursion used to stop at Map values only).
+        Map<String, Object> node1 = new LinkedHashMap<>();
+        node1.put("host", "db1");
+        node1.put("password", "s1");
+        Map<String, Object> node2 = new LinkedHashMap<>();
+        node2.put("host", "db2");
+        node2.put("token", "t2");
+
+        Map<String, Object> input = new LinkedHashMap<>();
+        input.put("nodes", new ArrayList<>(List.of(node1, node2)));
+
+        Map<String, Object> result = scrub(input);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> nodes = (List<Map<String, Object>>) result.get("nodes");
+        assertThat(nodes, hasSize(2));
+        assertThat(nodes.get(0).get("password"), is("******"));
+        assertThat(nodes.get(0).get("host"), is("db1"));
+        assertThat(nodes.get(1).get("token"), is("******"));
+        assertThat(nodes.get(1).get("host"), is("db2"));
+    }
+
+    @Test
+    void scrub_doesNotOverRedactBenignKeys() throws Exception {
+        // These all contain a sensitive pattern as a substring but no sensitive whole token,
+        // so their values must be preserved.
+        Map<String, Object> input = new LinkedHashMap<>();
+        input.put("keyspace", "analytics");   // contains "key"
+        input.put("sortkey", "created_at");    // contains "key"
+        input.put("author", "alice");          // contains "auth"
+
+        Map<String, Object> result = scrub(input);
+
+        assertThat(result.get("keyspace"), is("analytics"));
+        assertThat(result.get("sortkey"), is("created_at"));
+        assertThat(result.get("author"), is("alice"));
     }
 }

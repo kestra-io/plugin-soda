@@ -2,7 +2,9 @@ package io.kestra.plugin.soda;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -107,17 +109,28 @@ import lombok.experimental.SuperBuilder;
 public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
     private static final String REDACTED = "******";
 
-    private static final Set<String> SENSITIVE_KEY_PATTERNS = Set.of(
+    /**
+     * Whole-token markers: a key is sensitive when one of its tokens (split on separators and
+     * camelCase boundaries) exactly equals one of these. Matching on tokens rather than substrings
+     * avoids over-redacting benign keys such as {@code keyspace}, {@code sortkey} or {@code author}.
+     * Note {@code key} as a token already covers {@code api_key}, {@code access_key},
+     * {@code private_key}, {@code apiKey}, etc.
+     */
+    private static final Set<String> SENSITIVE_KEY_TOKENS = Set.of(
         "password", "passwd", "pwd",
-        "secret",
-        "token",
-        "key",
+        "secret", "secrets",
+        "token", "tokens",
+        "key", "keys",
         "credential", "credentials",
-        "account_info_json",
-        "private_key",
-        "api_key", "apikey",
-        "access_key",
         "auth"
+    );
+
+    /**
+     * Compound key names matched against the fully normalized (alphanumeric-only, lowercased) key,
+     * for sensitive keys whose individual tokens are not themselves secret markers.
+     */
+    private static final Set<String> SENSITIVE_NORMALIZED_KEYS = Set.of(
+        "accountinfojson"
     );
 
     @Schema(
@@ -216,14 +229,33 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
 
             if (isSensitiveKey(key)) {
                 scrubbed.put(key, REDACTED);
-            } else if (value instanceof Map) {
-                scrubbed.put(key, scrubSensitiveValues((Map<String, Object>) value));
             } else {
-                scrubbed.put(key, value);
+                scrubbed.put(key, scrubValue(value));
             }
         }
 
         return scrubbed;
+    }
+
+    /**
+     * Recurses through container values so sensitive keys nested inside maps <em>or lists</em>
+     * (e.g. a list of connection maps) are scrubbed too; scalar values are returned unchanged.
+     */
+    @SuppressWarnings("unchecked")
+    private static Object scrubValue(Object value) {
+        if (value instanceof Map) {
+            return scrubSensitiveValues((Map<String, Object>) value);
+        }
+
+        if (value instanceof List) {
+            List<Object> scrubbedList = new ArrayList<>();
+            for (Object element : (List<Object>) value) {
+                scrubbedList.add(scrubValue(element));
+            }
+            return scrubbedList;
+        }
+
+        return value;
     }
 
     private static boolean isSensitiveKey(String key) {
@@ -232,13 +264,40 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
         }
 
         String normalized = key.toLowerCase().replaceAll("[^a-z0-9]", "");
-        for (String pattern : SENSITIVE_KEY_PATTERNS) {
-            if (normalized.contains(pattern.replaceAll("[^a-z0-9]", ""))) {
+        if (SENSITIVE_NORMALIZED_KEYS.contains(normalized)) {
+            return true;
+        }
+
+        for (String token : tokenize(key)) {
+            if (SENSITIVE_KEY_TOKENS.contains(token)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Splits a key into lowercase tokens on non-alphanumeric separators and camelCase boundaries,
+     * so {@code account_info_json}, {@code apiKey} and {@code APIKey} all yield word-level tokens.
+     */
+    private static List<String> tokenize(String key) {
+        String spaced = key
+            .replaceAll("([A-Z]+)([A-Z][a-z])", "$1 $2")
+            .replaceAll("([a-z0-9])([A-Z])", "$1 $2")
+            .replaceAll("[^a-zA-Z0-9]+", " ")
+            .trim();
+
+        List<String> tokens = new ArrayList<>();
+        if (spaced.isEmpty()) {
+            return tokens;
+        }
+
+        for (String token : spaced.split("\\s+")) {
+            tokens.add(token.toLowerCase());
+        }
+
+        return tokens;
     }
 
     protected ScanResult parseResult(RunContext runContext, ScriptOutput output) throws IOException {
