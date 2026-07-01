@@ -2,8 +2,12 @@ package io.kestra.plugin.soda;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
@@ -103,6 +107,25 @@ import lombok.experimental.SuperBuilder;
     }
 )
 public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
+    private static final String REDACTED = "******";
+
+    /**
+     * Sensitive fragments matched as substrings of the normalized (alphanumeric-only, lowercased)
+     * key. Substring matching deliberately errs toward over-redaction — any key merely containing
+     * one of these (e.g. {@code keyfile}, {@code keyspace}, {@code client_secret}) is redacted — so
+     * that a secret is never leaked into task Output at the cost of occasionally masking a benign
+     * value. {@code key} already covers {@code api_key}, {@code access_key}, {@code private_key}, etc.
+     */
+    private static final Set<String> SENSITIVE_KEY_PATTERNS = Set.of(
+        "password", "passwd", "pwd",
+        "secret",
+        "token",
+        "key",
+        "credential",
+        "accountinfojson",
+        "auth"
+    );
+
     @Schema(
         title = "SodaCL checks definition",
         description = "Required map rendered to `checks.yml` and executed against the `kestra` data source. Follow SodaCL syntax; failing checks mark the task accordingly."
@@ -179,9 +202,68 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
             .result(scanResult)
             .stdOutLineCount(output.getStdOutLineCount())
             .stdErrLineCount(output.getStdOutLineCount())
-            .configuration(runContext.render(configuration).asMap(String.class, Object.class))
+            .configuration(scrubSensitiveValues(runContext.render(configuration).asMap(String.class, Object.class)))
             .exitCode((Integer) output.getVars().get("exitCode"))
             .build();
+    }
+
+    /**
+     * Recursively scrubs sensitive leaf values (passwords, tokens, keys, credentials, etc.) from a
+     * rendered configuration map before it is stored in task Output, which is persisted in execution
+     * state and visible to any user with read access to the execution.
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> scrubSensitiveValues(Map<String, Object> map) {
+        Map<String, Object> scrubbed = new LinkedHashMap<>();
+
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+
+            if (isSensitiveKey(key)) {
+                scrubbed.put(key, REDACTED);
+            } else {
+                scrubbed.put(key, scrubValue(value));
+            }
+        }
+
+        return scrubbed;
+    }
+
+    /**
+     * Recurses through container values so sensitive keys nested inside maps <em>or lists</em>
+     * (e.g. a list of connection maps) are scrubbed too; scalar values are returned unchanged.
+     */
+    @SuppressWarnings("unchecked")
+    private static Object scrubValue(Object value) {
+        if (value instanceof Map) {
+            return scrubSensitiveValues((Map<String, Object>) value);
+        }
+
+        if (value instanceof List) {
+            List<Object> scrubbedList = new ArrayList<>();
+            for (Object element : (List<Object>) value) {
+                scrubbedList.add(scrubValue(element));
+            }
+            return scrubbedList;
+        }
+
+        return value;
+    }
+
+    private static boolean isSensitiveKey(String key) {
+        if (key == null) {
+            return false;
+        }
+
+        String normalized = key.toLowerCase().replaceAll("[^a-z0-9]", "");
+        for (String pattern : SENSITIVE_KEY_PATTERNS) {
+            if (normalized.contains(pattern)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected ScanResult parseResult(RunContext runContext, ScriptOutput output) throws IOException {
