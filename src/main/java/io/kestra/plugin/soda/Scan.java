@@ -110,27 +110,20 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
     private static final String REDACTED = "******";
 
     /**
-     * Whole-token markers: a key is sensitive when one of its tokens (split on separators and
-     * camelCase boundaries) exactly equals one of these. Matching on tokens rather than substrings
-     * avoids over-redacting benign keys such as {@code keyspace}, {@code sortkey} or {@code author}.
-     * Note {@code key} as a token already covers {@code api_key}, {@code access_key},
-     * {@code private_key}, {@code apiKey}, etc.
+     * Sensitive fragments matched as substrings of the normalized (alphanumeric-only, lowercased)
+     * key. Substring matching deliberately errs toward over-redaction — any key merely containing
+     * one of these (e.g. {@code keyfile}, {@code keyspace}, {@code client_secret}) is redacted — so
+     * that a secret is never leaked into task Output at the cost of occasionally masking a benign
+     * value. {@code key} already covers {@code api_key}, {@code access_key}, {@code private_key}, etc.
      */
-    private static final Set<String> SENSITIVE_KEY_TOKENS = Set.of(
+    private static final Set<String> SENSITIVE_KEY_PATTERNS = Set.of(
         "password", "passwd", "pwd",
-        "secret", "secrets",
-        "token", "tokens",
-        "key", "keys",
-        "credential", "credentials",
+        "secret",
+        "token",
+        "key",
+        "credential",
+        "accountinfojson",
         "auth"
-    );
-
-    /**
-     * Compound key names matched against the fully normalized (alphanumeric-only, lowercased) key,
-     * for sensitive keys whose individual tokens are not themselves secret markers.
-     */
-    private static final Set<String> SENSITIVE_NORMALIZED_KEYS = Set.of(
-        "accountinfojson"
     );
 
     @Schema(
@@ -264,40 +257,13 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
         }
 
         String normalized = key.toLowerCase().replaceAll("[^a-z0-9]", "");
-        if (SENSITIVE_NORMALIZED_KEYS.contains(normalized)) {
-            return true;
-        }
-
-        for (String token : tokenize(key)) {
-            if (SENSITIVE_KEY_TOKENS.contains(token)) {
+        for (String pattern : SENSITIVE_KEY_PATTERNS) {
+            if (normalized.contains(pattern)) {
                 return true;
             }
         }
 
         return false;
-    }
-
-    /**
-     * Splits a key into lowercase tokens on non-alphanumeric separators and camelCase boundaries,
-     * so {@code account_info_json}, {@code apiKey} and {@code APIKey} all yield word-level tokens.
-     */
-    private static List<String> tokenize(String key) {
-        String spaced = key
-            .replaceAll("([A-Z]+)([A-Z][a-z])", "$1 $2")
-            .replaceAll("([a-z0-9])([A-Z])", "$1 $2")
-            .replaceAll("[^a-zA-Z0-9]+", " ")
-            .trim();
-
-        List<String> tokens = new ArrayList<>();
-        if (spaced.isEmpty()) {
-            return tokens;
-        }
-
-        for (String token : spaced.split("\\s+")) {
-            tokens.add(token.toLowerCase());
-        }
-
-        return tokens;
     }
 
     protected ScanResult parseResult(RunContext runContext, ScriptOutput output) throws IOException {

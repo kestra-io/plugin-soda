@@ -148,18 +148,20 @@ class SecurityHardeningTest {
     }
 
     @Test
-    void scrub_doesNotOverRedactBenignKeys() throws Exception {
-        // These all contain a sensitive pattern as a substring but no sensitive whole token,
-        // so their values must be preserved.
+    void scrub_redactsAnyKeyContainingSensitiveSubstring() throws Exception {
+        // Deliberate over-redaction: matching is by substring, so any key merely containing a
+        // sensitive fragment is masked rather than risk leaking a secret.
         Map<String, Object> input = new LinkedHashMap<>();
-        input.put("keyspace", "analytics");   // contains "key"
-        input.put("sortkey", "created_at");    // contains "key"
-        input.put("author", "alice");          // contains "auth"
+        input.put("keyfile", "/path/to/sa.json");
+        input.put("keyspace", "analytics");
+        input.put("sortkey", "created_at");
+        input.put("author", "alice");
 
         Map<String, Object> result = scrub(input);
 
-        assertThat(result.get("keyspace"), is("analytics"));
-        assertThat(result.get("sortkey"), is("created_at"));
-        assertThat(result.get("author"), is("alice"));
+        assertThat(result.get("keyfile"), is("******"));
+        assertThat(result.get("keyspace"), is("******"));
+        assertThat(result.get("sortkey"), is("******"));
+        assertThat(result.get("author"), is("******"));
     }
 }
