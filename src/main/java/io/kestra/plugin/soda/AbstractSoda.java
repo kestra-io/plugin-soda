@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -60,7 +61,7 @@ public abstract class AbstractSoda extends Task {
     private DockerOptions docker;
 
     @Schema(
-        title = "The task runner to use.",
+        title = "The task runner to use",
         description = "Task runners are provided by plugins, each have their own properties."
     )
     @PluginProperty(group = "execution")
@@ -68,7 +69,7 @@ public abstract class AbstractSoda extends Task {
     @Valid
     private TaskRunner<?> taskRunner = Docker.instance();
 
-    @Schema(title = "The task runner container image, only used if the task runner is container-based.")
+    @Schema(title = "The task runner container image, only used if the task runner is container-based")
     @Builder.Default
     @PluginProperty(group = "execution")
     private Property<String> containerImage = Property.ofValue(DEFAULT_IMAGE);
@@ -85,7 +86,7 @@ public abstract class AbstractSoda extends Task {
     }
 
     @Schema(
-        title = "Input files are extra files that will be available in the dbt working directory.",
+        title = "Input files are extra files that will be available in the dbt working directory",
         description = "You can define the files as map or a JSON string. " +
             "Each file can be defined inlined or can reference a file from Kestra's internal storage."
     )
@@ -103,7 +104,7 @@ public abstract class AbstractSoda extends Task {
     protected Property<List<String>> requirements;
 
     @Schema(
-        title = "Additional environment variables for the current process."
+        title = "Additional environment variables for the current process"
     )
     @PluginProperty(group = "execution")
     protected Property<Map<String, String>> env;
@@ -185,14 +186,30 @@ public abstract class AbstractSoda extends Task {
         renderer.add("python -m venv --system-site-packages " + workingDirectory + " > /dev/null");
 
         if (requirements != null) {
+            String installArgs = requirements.stream()
+                .map(AbstractSoda::shellQuote)
+                .collect(Collectors.joining(" "));
+
             renderer.addAll(
                 Arrays.asList(
                     "./bin/pip install pip --upgrade > /dev/null",
-                    "./bin/pip install " + runContext.render(String.join(" ", requirements)) + " > /dev/null"
+                    "./bin/pip install " + installArgs + " > /dev/null"
                 )
             );
         }
 
         return String.join("\n", renderer);
+    }
+
+    /**
+     * Wraps a value in single quotes for safe interpolation into a {@code /bin/sh -c} command line.
+     * Inside single quotes the shell treats every character literally, so all metacharacters
+     * ({@code ; & | > < * $ ` ( )} …) are neutralized while any valid {@code requirements.txt} syntax
+     * (version specifiers, extras, VCS URLs, environment markers) is preserved verbatim. The only
+     * character that cannot appear inside single quotes — the single quote itself — is escaped with
+     * the standard {@code '\''} sequence (close quote, escaped quote, reopen quote).
+     */
+    private static String shellQuote(String value) {
+        return "'" + value.replace("'", "'\\''") + "'";
     }
 }

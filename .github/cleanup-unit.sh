@@ -20,7 +20,7 @@ TABLES=(
 
 for TABLE in "${TABLES[@]}"; do
   echo "🗑️  Deleting table ${TABLE}..."
-  bq rm -f -t "${PROJECT_ID}:${DATASET}.${TABLE}" || echo "⚠️ Table ${TABLE} not found, skipping."
+  bq rm --project_id="${PROJECT_ID}" -f -t "${PROJECT_ID}:${DATASET}.${TABLE}" || echo "⚠️ Table ${TABLE} not found, skipping."
 done
 
 echo "✅ Test tables cleaned up successfully"
