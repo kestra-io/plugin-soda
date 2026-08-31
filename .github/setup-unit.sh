@@ -1,5 +1,12 @@
 set -euo pipefail
 
+# Dependabot PR runs read the Dependabot secret store, which does not carry
+# GOOGLE_SERVICE_ACCOUNT, so there are no BigQuery credentials and nothing to set up.
+if [ -z "${GOOGLE_SERVICE_ACCOUNT:-}" ]; then
+  echo "GOOGLE_SERVICE_ACCOUNT not available, skipping"
+  exit 0
+fi
+
 echo $GOOGLE_SERVICE_ACCOUNT | base64 -d > src/test/resources/.gcp-service-account.json
 
 # Authenticate gcloud with the decoded service account
