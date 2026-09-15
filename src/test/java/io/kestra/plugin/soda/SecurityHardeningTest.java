@@ -13,10 +13,12 @@ import static org.hamcrest.Matchers.*;
 
 /**
  * Fast, dependency-free unit tests for the security-hardening helpers introduced in the
- * 2026-06-30 audit remediation PR: shell-quoting of pip requirements ({@link AbstractSoda})
- * and sensitive-value scrubbing of the rendered configuration ({@link Scan}). Both helpers are
- * {@code private static} pure functions, so they are exercised directly via reflection rather than
- * through the Docker/BigQuery integration path used by {@code ScanTest}.
+ * 2026-06-30 audit remediation PR: shell-quoting of pip requirements and sensitive-value scrubbing
+ * of a rendered connection map. Both live on {@link AbstractSoda} — scrubbing is shared by every
+ * subclass that echoes its connection map back in Output ({@link Scan}'s {@code configuration},
+ * {@link VerifyContract}'s {@code dataSource}) — as {@code private}/{@code protected static} pure
+ * functions, so they are exercised directly via reflection rather than through the
+ * Docker/BigQuery/DuckDB integration paths used by {@code ScanTest}/{@code VerifyContractTest}.
  */
 class SecurityHardeningTest {
 
@@ -28,7 +30,7 @@ class SecurityHardeningTest {
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> scrub(Map<String, Object> input) throws Exception {
-        Method method = Scan.class.getDeclaredMethod("scrubSensitiveValues", Map.class);
+        Method method = AbstractSoda.class.getDeclaredMethod("scrubSensitiveValues", Map.class);
         method.setAccessible(true);
         return (Map<String, Object>) method.invoke(null, input);
     }
@@ -71,6 +73,28 @@ class SecurityHardeningTest {
     }
 
     // --- scrubSensitiveValues ---------------------------------------------------------------
+
+    @Test
+    void scrub_redactsSodaCore4DataSourceShape() throws Exception {
+        // VerifyContract's `dataSource` (Soda Core 4) goes through the exact same scrubbing path
+        // as Scan's `configuration` (Soda Core 3), just with a different top-level YAML shape.
+        Map<String, Object> connection = new LinkedHashMap<>();
+        connection.put("host", "db.internal");
+        connection.put("password", "hunter2");
+
+        Map<String, Object> dataSource = new LinkedHashMap<>();
+        dataSource.put("type", "postgres");
+        dataSource.put("name", "kestra");
+        dataSource.put("connection", connection);
+
+        Map<String, Object> result = scrub(dataSource);
+
+        assertThat(result.get("type"), is("postgres"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> scrubbedConnection = (Map<String, Object>) result.get("connection");
+        assertThat(scrubbedConnection.get("host"), is("db.internal"));
+        assertThat(scrubbedConnection.get("password"), is("******"));
+    }
 
     @Test
     void scrub_redactsTopLevelSensitiveKeys() throws Exception {

@@ -2,12 +2,8 @@ package io.kestra.plugin.soda;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
@@ -36,8 +32,11 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @Schema(
     title = "Run Soda scan and report results",
-    description = "Executes SodaCL checks with the provided configuration, writes scan results to internal storage, and emits metrics to Kestra. Uses the soda-core container by default, runs non-verbose unless `verbose` is true, and requires both configuration and checks to be supplied."
+    description = "Executes SodaCL checks with the provided configuration, writes scan results to internal storage, and emits metrics to Kestra. Uses a pinned Soda Core 3 container by default, runs non-verbose unless `verbose` is true, and requires both configuration and checks to be supplied.\n\n" +
+        "Deprecated: Soda Core 3 is end-of-line and pinned to `sodadata/soda-core:v3.5.2` to prevent an unannounced upgrade. Use `io.kestra.plugin.soda.VerifyContract` for Soda Core 4 instead — this is not a drop-in swap, SodaCL `checks` must be rewritten as Soda Core 4 data contracts (`dataset` + `columns` + `checks` YAML).",
+    deprecated = true
 )
+@Deprecated
 @Plugin(
     examples = {
         @Example(
@@ -70,7 +69,7 @@ import lombok.experimental.SuperBuilder;
                             name: Failed rows query test
                             fail condition: regionId = 4
                     requirements:
-                      - soda-core-bigquery
+                      - soda-core-bigquery==3.5.6
                 """
         ),
         @Example(
@@ -101,30 +100,19 @@ import lombok.experimental.SuperBuilder;
                       threshold: 1000
                     verbose: true
                     requirements:
-                      - soda-core-postgres
+                      - soda-core-postgres==3.5.6
                 """
         )
     }
 )
 public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
-    private static final String REDACTED = "******";
-
     /**
-     * Sensitive fragments matched as substrings of the normalized (alphanumeric-only, lowercased)
-     * key. Substring matching deliberately errs toward over-redaction — any key merely containing
-     * one of these (e.g. {@code keyfile}, {@code keyspace}, {@code client_secret}) is redacted — so
-     * that a secret is never leaked into task Output at the cost of occasionally masking a benign
-     * value. {@code key} already covers {@code api_key}, {@code access_key}, {@code private_key}, etc.
+     * The last soda-core 3.x release published on PyPI (the {@code sodadata/soda-core} Docker
+     * image is likewise frozen at {@code v3.5.2}, its last push). Pinning here — rather than
+     * floating on {@code :latest} — means a future v4 retag of the image cannot silently break
+     * existing flows that still rely on the SodaCL/3.x contract.
      */
-    private static final Set<String> SENSITIVE_KEY_PATTERNS = Set.of(
-        "password", "passwd", "pwd",
-        "secret",
-        "token",
-        "key",
-        "credential",
-        "accountinfojson",
-        "auth"
-    );
+    private static final String DEFAULT_IMAGE = "sodadata/soda-core:v3.5.2";
 
     @Schema(
         title = "SodaCL checks definition",
@@ -149,7 +137,27 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
     Property<Boolean> verbose = Property.ofValue(false);
 
     @Override
+    protected String defaultImage() {
+        return DEFAULT_IMAGE;
+    }
+
+    @Override
     protected Map<String, String> finalInputFiles(RunContext runContext, Path workingDirectory) throws IOException, IllegalVariableEvaluationException {
+        var renderedConfig = runContext.render(this.getConfiguration()).asMap(String.class, Object.class);
+        if (renderedConfig.isEmpty()) {
+            throw new IllegalArgumentException(
+                "`configuration` is required and must be a SodaCL `data_source <name>:` connection block. " +
+                    "If you are trying to verify a Soda Core 4 data contract, use `io.kestra.plugin.soda.VerifyContract` instead."
+            );
+        }
+        if (renderedConfig.keySet().stream().noneMatch(key -> key.startsWith("data_source "))
+            && (renderedConfig.containsKey("dataset") || renderedConfig.containsKey("columns"))) {
+            throw new IllegalArgumentException(
+                "`configuration` looks like a Soda Core 4 data contract (found `dataset`/`columns` keys) rather than a SodaCL 3.x `data_source <name>:` block. " +
+                    "Use `io.kestra.plugin.soda.VerifyContract` to verify data contracts."
+            );
+        }
+
         Map<String, String> map = super.finalInputFiles(runContext, workingDirectory);
 
         String main = "import sys\n" +
@@ -205,65 +213,6 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
             .configuration(scrubSensitiveValues(runContext.render(configuration).asMap(String.class, Object.class)))
             .exitCode((Integer) output.getVars().get("exitCode"))
             .build();
-    }
-
-    /**
-     * Recursively scrubs sensitive leaf values (passwords, tokens, keys, credentials, etc.) from a
-     * rendered configuration map before it is stored in task Output, which is persisted in execution
-     * state and visible to any user with read access to the execution.
-     */
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> scrubSensitiveValues(Map<String, Object> map) {
-        Map<String, Object> scrubbed = new LinkedHashMap<>();
-
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            String key = entry.getKey();
-            Object value = entry.getValue();
-
-            if (isSensitiveKey(key)) {
-                scrubbed.put(key, REDACTED);
-            } else {
-                scrubbed.put(key, scrubValue(value));
-            }
-        }
-
-        return scrubbed;
-    }
-
-    /**
-     * Recurses through container values so sensitive keys nested inside maps <em>or lists</em>
-     * (e.g. a list of connection maps) are scrubbed too; scalar values are returned unchanged.
-     */
-    @SuppressWarnings("unchecked")
-    private static Object scrubValue(Object value) {
-        if (value instanceof Map) {
-            return scrubSensitiveValues((Map<String, Object>) value);
-        }
-
-        if (value instanceof List) {
-            List<Object> scrubbedList = new ArrayList<>();
-            for (Object element : (List<Object>) value) {
-                scrubbedList.add(scrubValue(element));
-            }
-            return scrubbedList;
-        }
-
-        return value;
-    }
-
-    private static boolean isSensitiveKey(String key) {
-        if (key == null) {
-            return false;
-        }
-
-        String normalized = key.toLowerCase().replaceAll("[^a-z0-9]", "");
-        for (String pattern : SENSITIVE_KEY_PATTERNS) {
-            if (normalized.contains(pattern)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     protected ScanResult parseResult(RunContext runContext, ScriptOutput output) throws IOException {

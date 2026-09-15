@@ -2,7 +2,7 @@ group: io.kestra.plugin.soda
 name: "soda"
 title: "Soda"
 description: "Tasks that run Soda scans for data quality checks."
-body: "Provide Soda configuration and `checks` YAML along with any required connectors or variables to execute scans via the Soda CLI container, emitting check metrics and results files you can inspect or fail pipelines on."
+body: "Provide Soda configuration and `checks` YAML along with any required connectors or variables to execute scans (deprecated Soda Core 3, via `Scan`) or verify data contracts (Soda Core 4, via `VerifyContract`), emitting check outcomes and results files you can inspect or fail pipelines on."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

@@ -46,7 +46,7 @@
 ## What
 
 - Provides plugin components under `io.kestra.plugin.soda`.
-- Includes classes such as `Scan`, `ScanResult`, `DiscoverTablesResultTable`, `Metric`.
+- Includes classes such as `Scan` (deprecated, Soda Core 3), `VerifyContract` (Soda Core 4), `ScanResult`, `ContractVerificationResult`, `DiscoverTablesResultTable`, `Metric`.
 
 ## Documentation
 * Full documentation can be found under [kestra.io/docs](https://kestra.io/docs)
