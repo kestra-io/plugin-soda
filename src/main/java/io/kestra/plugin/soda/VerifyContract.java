@@ -21,6 +21,8 @@ import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 import io.kestra.plugin.scripts.exec.scripts.runners.CommandsWrapper;
 import io.kestra.plugin.soda.models.ContractVerificationResult;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -120,6 +122,16 @@ public class VerifyContract extends AbstractSoda implements RunnableTask<VerifyC
     @Builder.Default
     Property<Boolean> verbose = Property.ofValue(false);
 
+    /**
+     * Rendered {@link #dataSource} cached from {@link #finalInputFiles(RunContext, Path)} (called by
+     * {@link AbstractSoda#start(RunContext)}) and reused by {@link #run(RunContext)} for the
+     * {@code Output}, so the map is rendered exactly once per execution instead of twice.
+     */
+    @JsonIgnore
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private Map<String, Object> renderedDataSource;
+
     @Override
     protected String defaultImage() {
         return DEFAULT_IMAGE;
@@ -139,6 +151,7 @@ public class VerifyContract extends AbstractSoda implements RunnableTask<VerifyC
         if (rDataSource.isEmpty()) {
             throw new IllegalArgumentException("`dataSource` is required and must be a Soda Core 4 data source definition (`type`, `name`, `connection`).");
         }
+        this.renderedDataSource = rDataSource;
         if (rDataSource.keySet().stream().anyMatch(key -> key.startsWith("data_source "))) {
             throw new IllegalArgumentException(
                 "`dataSource` looks like a Soda Core 3 `data_source <name>:` block rather than a Soda Core 4 data source definition. " +
@@ -289,7 +302,7 @@ public class VerifyContract extends AbstractSoda implements RunnableTask<VerifyC
             .result(result)
             .stdOutLineCount(output.getStdOutLineCount())
             .stdErrLineCount(output.getStdErrLineCount())
-            .dataSource(scrubSensitiveValues(runContext.render(this.dataSource).asMap(String.class, Object.class)))
+            .dataSource(scrubSensitiveValues(this.renderedDataSource))
             .checkCount(checkCount)
             .hasFailures(Boolean.TRUE.equals(result.getHasFailures()))
             .hasWarnings(Boolean.TRUE.equals(result.getHasWarnings()))

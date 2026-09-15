@@ -89,7 +89,7 @@ public abstract class AbstractSoda extends Task {
 
     @Schema(
         title = "The task runner container image, only used if the task runner is container-based",
-        description = "Defaults to the image returned by the task's `defaultImage()` (e.g. a pinned Soda Core 3 image for `Scan`, a plain Python image for `VerifyContract`)."
+        description = "Defaults to `sodadata/soda-core:v3.5.2` for `Scan`, or `python:3.12-slim` for `VerifyContract`."
     )
     @PluginProperty(group = "execution")
     private Property<String> containerImage;

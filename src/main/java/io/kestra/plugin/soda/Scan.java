@@ -135,12 +135,14 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
         title = "Runtime variables",
         description = "Optional variables injected into the Soda scan for templating checks or configuration; values are rendered by Kestra before execution."
     )
+    @PluginProperty(group = "main")
     Property<Map<String, Object>> variables;
 
     @Schema(
         title = "Enable verbose logging",
         description = "Defaults to false; when true, the Soda scan runs with verbose output."
     )
+    @PluginProperty(group = "advanced")
     @Builder.Default
     Property<Boolean> verbose = Property.ofValue(false);
 
