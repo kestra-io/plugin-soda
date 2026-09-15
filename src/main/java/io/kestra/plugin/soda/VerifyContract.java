@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
@@ -185,45 +186,44 @@ public class VerifyContract extends AbstractSoda implements RunnableTask<VerifyC
      * guessed — see the PR description for how they were confirmed.
      */
     private String buildMainScript(RunContext runContext, List<String> contractFiles) throws IllegalVariableEvaluationException, IOException {
-        var contractFilesLiteral = contractFiles.stream()
+        var contractSourcesLiteral = contractFiles.stream()
             .map(file -> "ContractYamlSource.from_file_path(\"{{workingDir}}/" + file + "\")")
-            .reduce((a, b) -> a + ", " + b)
-            .orElse("");
+            .collect(Collectors.joining(", "));
 
-        var main = "import json\n" +
-            "import logging\n" +
-            "\n" +
-            "from soda_core.contracts.contract_verification import ContractVerificationSession\n" +
-            "from soda_core.common.yaml import ContractYamlSource, DataSourceYamlSource\n" +
-            "\n";
+        var logLevel = runContext.render(verbose).as(Boolean.class).orElse(false) ? "DEBUG" : "INFO";
 
-        main += "logging.basicConfig(level=logging." + (runContext.render(verbose).as(Boolean.class).orElse(false) ? "DEBUG" : "INFO") + ")\n\n";
+        var header = """
+            import json
+            import logging
 
-        main += "def _serialize_check(check_result):\n" +
-            "    check = check_result.check\n" +
-            "    return {\n" +
-            "        'name': check.name,\n" +
-            "        'type': check.type,\n" +
-            "        'column': check.column_name,\n" +
-            "        'definition': check.definition,\n" +
-            "        'outcome': check_result.outcome.value.lower(),\n" +
-            "    }\n" +
-            "\n" +
-            "def _serialize_contract(result):\n" +
-            "    return {\n" +
-            "        'dataSource': result.check_collection.data_source_name,\n" +
-            "        'dataset': result.check_collection.dataset_name,\n" +
-            "        'checks': [_serialize_check(check_result) for check_result in result.check_results],\n" +
-            "        'hasFailures': result.is_failed,\n" +
-            "        'hasWarnings': result.is_warned,\n" +
-            "        'hasErrors': result.has_errors,\n" +
-            "    }\n" +
-            "\n";
+            from soda_core.contracts.contract_verification import ContractVerificationSession
+            from soda_core.common.yaml import ContractYamlSource, DataSourceYamlSource
 
-        main += "session_result = ContractVerificationSession.execute(\n" +
-            "    contract_yaml_sources=[" + contractFilesLiteral + "],\n" +
-            "    data_source_yaml_sources=[DataSourceYamlSource.from_file_path(\"{{workingDir}}/data_source.yml\")],\n";
+            logging.basicConfig(level=logging.%s)
 
+            def _serialize_check(check_result):
+                check = check_result.check
+                return {
+                    'name': check.name,
+                    'type': check.type,
+                    'column': check.column_name,
+                    'definition': check.definition,
+                    'outcome': check_result.outcome.value.lower(),
+                }
+
+            def _serialize_contract(result):
+                return {
+                    'dataSource': result.check_collection.data_source_name,
+                    'dataset': result.check_collection.dataset_name,
+                    'checks': [_serialize_check(check_result) for check_result in result.check_results],
+                    'hasFailures': result.is_failed,
+                    'hasWarnings': result.is_warned,
+                    'hasErrors': result.has_errors,
+                }
+
+            """.formatted(logLevel);
+
+        var variablesArg = "";
         if (variables != null) {
             // JSON booleans/null (true/false/null) are not valid Python literals (Python needs
             // True/False/None), so the rendered variables cannot be spliced directly into a Python
@@ -231,40 +231,47 @@ public class VerifyContract extends AbstractSoda implements RunnableTask<VerifyC
             // JSON-encoding it a second time, which produces valid Python string-escaping too) and
             // parse it at runtime with `json.loads`, letting Python's own JSON parser produce the
             // correct True/False/None values.
-            String variablesJson = JacksonMapper.ofJson().writeValueAsString(runContext.render(variables).asMap(String.class, Object.class));
-            String variablesPythonLiteral = JacksonMapper.ofJson().writeValueAsString(variablesJson);
-            main += "    variables=json.loads(" + variablesPythonLiteral + "),\n";
+            var variablesJson = JacksonMapper.ofJson().writeValueAsString(runContext.render(variables).asMap(String.class, Object.class));
+            var variablesLiteral = JacksonMapper.ofJson().writeValueAsString(variablesJson);
+            variablesArg = "    variables=json.loads(%s),\n".formatted(variablesLiteral);
         }
 
-        main += ")\n\n";
+        var execution = """
+            session_result = ContractVerificationSession.execute(
+                contract_yaml_sources=[%s],
+                data_source_yaml_sources=[DataSourceYamlSource.from_file_path("{{workingDir}}/data_source.yml")],
+            %s)
 
-        main += "contract_results = [_serialize_contract(result) for result in session_result.contract_verification_results]\n" +
-            "has_failures = session_result.is_failed\n" +
-            "has_warnings = session_result.is_warned\n" +
-            "has_errors = session_result.has_errors\n" +
-            "\n" +
-            "if has_errors:\n" +
-            "    exit_code = 3\n" +
-            "elif has_failures:\n" +
-            "    exit_code = 1\n" +
-            "elif has_warnings:\n" +
-            "    exit_code = 2\n" +
-            "else:\n" +
-            "    exit_code = 0\n" +
-            "\n" +
-            "payload = {\n" +
-            "    'contractResults': contract_results,\n" +
-            "    'hasFailures': has_failures,\n" +
-            "    'hasWarnings': has_warnings,\n" +
-            "    'hasErrors': has_errors,\n" +
-            "}\n" +
-            "\n" +
-            "with open('{{workingDir}}/result.json', 'w') as out:\n" +
-            "    out.write(json.dumps(payload))\n" +
-            "\n" +
-            "print('::{\"outputs\": {\"exitCode\":', exit_code, '}}::')";
+            """.formatted(contractSourcesLiteral, variablesArg);
 
-        return main;
+        var footer = """
+            contract_results = [_serialize_contract(result) for result in session_result.contract_verification_results]
+            has_failures = session_result.is_failed
+            has_warnings = session_result.is_warned
+            has_errors = session_result.has_errors
+
+            if has_errors:
+                exit_code = 3
+            elif has_failures:
+                exit_code = 1
+            elif has_warnings:
+                exit_code = 2
+            else:
+                exit_code = 0
+
+            payload = {
+                'contractResults': contract_results,
+                'hasFailures': has_failures,
+                'hasWarnings': has_warnings,
+                'hasErrors': has_errors,
+            }
+
+            with open('{{workingDir}}/result.json', 'w') as out:
+                out.write(json.dumps(payload))
+
+            print('::{"outputs": {"exitCode":', exit_code, '}}::')""";
+
+        return header + execution + footer;
     }
 
     @Override
