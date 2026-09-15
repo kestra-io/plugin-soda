@@ -115,6 +115,14 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
     private static final String DEFAULT_IMAGE = "sodadata/soda-core:v3.5.2";
 
     @Schema(
+        title = "The configuration file",
+        description = "Required SodaCL `data_source <name>:` connection block rendered to `configuration.yml`."
+    )
+    @PluginProperty(group = "main")
+    @NotNull
+    Property<Map<String, Object>> configuration;
+
+    @Schema(
         title = "SodaCL checks definition",
         description = "Required map rendered to `checks.yml` and executed against the `kestra` data source. Follow SodaCL syntax; failing checks mark the task accordingly."
     )
@@ -143,7 +151,7 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
 
     @Override
     protected Map<String, String> finalInputFiles(RunContext runContext, Path workingDirectory) throws IOException, IllegalVariableEvaluationException {
-        var renderedConfig = runContext.render(this.getConfiguration()).asMap(String.class, Object.class);
+        var renderedConfig = runContext.render(this.configuration).asMap(String.class, Object.class);
         if (renderedConfig.isEmpty()) {
             throw new IllegalArgumentException(
                 "`configuration` is required and must be a SodaCL `data_source <name>:` connection block. " +
@@ -159,6 +167,7 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
         }
 
         Map<String, String> map = super.finalInputFiles(runContext, workingDirectory);
+        map.put("configuration.yml", MAPPER.writeValueAsString(renderedConfig));
 
         String main = "import sys\n" +
             "import json\n" +

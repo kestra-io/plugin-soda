@@ -2,6 +2,7 @@ package io.kestra.plugin.soda;
 
 import java.io.InputStream;
 import java.net.URI;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -67,7 +68,7 @@ class VerifyContractTest {
             .type(VerifyContract.class.getName())
             .taskRunner(Docker.builder().type(Docker.class.getName()).build())
             .inputFiles(inputFiles(runContext))
-            .requirements(Property.ofValue(List.of("soda-core", "soda-duckdb")))
+            .requirements(Property.ofValue(List.of("soda-core==4.23.1", "soda-duckdb==4.23.1")))
             .dataSource(Property.ofValue(duckDbDataSource()))
             .contracts(
                 Property.ofValue(
@@ -101,6 +102,47 @@ class VerifyContractTest {
     }
 
     @Test
+    void runWithBooleanAndNullVariables() throws Exception {
+        // Locks in the fix for variables spliced as raw JSON into a Python dict literal: JSON
+        // `true`/`null` are not valid Python literals (Python needs `True`/`None`), so a boolean or
+        // null-valued variable used to raise a `NameError` when the generated script ran.
+        RunContext runContext = runContextFactory.of(ImmutableMap.of());
+
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("enabled", true);
+        variables.put("threshold", null);
+
+        VerifyContract task = VerifyContract.builder()
+            .id("unit-test")
+            .type(VerifyContract.class.getName())
+            .taskRunner(Docker.builder().type(Docker.class.getName()).build())
+            .inputFiles(inputFiles(runContext))
+            .requirements(Property.ofValue(List.of("soda-core==4.23.1", "soda-duckdb==4.23.1")))
+            .dataSource(Property.ofValue(duckDbDataSource()))
+            .variables(Property.ofValue(variables))
+            .contracts(
+                Property.ofValue(
+                    JacksonMapper.ofYaml().readValue(
+                        "- dataset: kestra/orders\n" +
+                            "  columns:\n" +
+                            "    - name: id\n" +
+                            "  checks:\n" +
+                            "    - row_count: {}\n",
+                        LIST_TYPE_REFERENCE
+                    )
+                )
+            )
+            .build();
+
+        runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());
+        VerifyContract.Output runOutput = task.run(runContext);
+
+        assertThat(runOutput.isHasErrors(), is(false));
+        assertThat(runOutput.isHasFailures(), is(false));
+        assertThat(runOutput.finalState().get(), is(State.Type.SUCCESS));
+    }
+
+    @Test
     void failed() throws Exception {
         RunContext runContext = runContextFactory.of(ImmutableMap.of());
 
@@ -109,7 +151,7 @@ class VerifyContractTest {
             .type(VerifyContract.class.getName())
             .taskRunner(Docker.builder().type(Docker.class.getName()).build())
             .inputFiles(inputFiles(runContext))
-            .requirements(Property.ofValue(List.of("soda-core", "soda-duckdb")))
+            .requirements(Property.ofValue(List.of("soda-core==4.23.1", "soda-duckdb==4.23.1")))
             .dataSource(Property.ofValue(duckDbDataSource()))
             .contracts(
                 Property.ofValue(
@@ -146,7 +188,7 @@ class VerifyContractTest {
             .type(VerifyContract.class.getName())
             .taskRunner(Docker.builder().type(Docker.class.getName()).build())
             .inputFiles(inputFiles(runContext))
-            .requirements(Property.ofValue(List.of("soda-core", "soda-duckdb")))
+            .requirements(Property.ofValue(List.of("soda-core==4.23.1", "soda-duckdb==4.23.1")))
             .dataSource(Property.ofValue(duckDbDataSource()))
             .contracts(
                 Property.ofValue(
@@ -184,7 +226,7 @@ class VerifyContractTest {
             .type(VerifyContract.class.getName())
             .taskRunner(Docker.builder().type(Docker.class.getName()).build())
             .inputFiles(inputFiles(runContext))
-            .requirements(Property.ofValue(List.of("soda-core", "soda-duckdb")))
+            .requirements(Property.ofValue(List.of("soda-core==4.23.1", "soda-duckdb==4.23.1")))
             .dataSource(Property.ofValue(dataSourceWithSecret))
             .contracts(
                 Property.ofValue(

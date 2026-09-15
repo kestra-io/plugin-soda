@@ -65,8 +65,8 @@ import lombok.experimental.SuperBuilder;
                     inputFiles:
                       orders.duckdb: "{{ outputs.seed_orders.outputFiles['orders.duckdb'] }}"
                     requirements:
-                      - soda-core
-                      - soda-duckdb
+                      - soda-core==4.23.1
+                      - soda-duckdb==4.23.1
                     dataSource:
                       type: duckdb
                       name: kestra
@@ -108,12 +108,14 @@ public class VerifyContract extends AbstractSoda implements RunnableTask<VerifyC
         title = "Runtime variables",
         description = "Optional variables injected into the contract verification for templating the data source or contracts; values are rendered by Kestra before execution."
     )
+    @PluginProperty(group = "main")
     Property<Map<String, Object>> variables;
 
     @Schema(
         title = "Enable verbose logging",
         description = "Defaults to false; when true, the contract verification runs with debug-level logging."
     )
+    @PluginProperty(group = "advanced")
     @Builder.Default
     Property<Boolean> verbose = Property.ofValue(false);
 
@@ -223,7 +225,15 @@ public class VerifyContract extends AbstractSoda implements RunnableTask<VerifyC
             "    data_source_yaml_sources=[DataSourceYamlSource.from_file_path(\"{{workingDir}}/data_source.yml\")],\n";
 
         if (variables != null) {
-            main += "    variables=" + JacksonMapper.ofJson().writeValueAsString(runContext.render(variables).asMap(String.class, Object.class)) + ",\n";
+            // JSON booleans/null (true/false/null) are not valid Python literals (Python needs
+            // True/False/None), so the rendered variables cannot be spliced directly into a Python
+            // dict-literal position. Instead, embed the JSON text as a Python string literal (by
+            // JSON-encoding it a second time, which produces valid Python string-escaping too) and
+            // parse it at runtime with `json.loads`, letting Python's own JSON parser produce the
+            // correct True/False/None values.
+            String variablesJson = JacksonMapper.ofJson().writeValueAsString(runContext.render(variables).asMap(String.class, Object.class));
+            String variablesPythonLiteral = JacksonMapper.ofJson().writeValueAsString(variablesJson);
+            main += "    variables=json.loads(" + variablesPythonLiteral + "),\n";
         }
 
         main += ")\n\n";
@@ -271,7 +281,7 @@ public class VerifyContract extends AbstractSoda implements RunnableTask<VerifyC
         return Output.builder()
             .result(result)
             .stdOutLineCount(output.getStdOutLineCount())
-            .stdErrLineCount(output.getStdOutLineCount())
+            .stdErrLineCount(output.getStdErrLineCount())
             .dataSource(scrubSensitiveValues(runContext.render(this.dataSource).asMap(String.class, Object.class)))
             .checkCount(checkCount)
             .hasFailures(Boolean.TRUE.equals(result.getHasFailures()))
@@ -342,13 +352,14 @@ public class VerifyContract extends AbstractSoda implements RunnableTask<VerifyC
             description = "Data source connection map applied to the contract verification, as rendered by Kestra expressions."
         )
         @NotNull
-        private Map<String, Object> dataSource;
+        private final Map<String, Object> dataSource;
 
         @Override
         public Optional<State.Type> finalState() {
             return Optional.of(switch (this.exitCode) {
                 case 0 -> State.Type.SUCCESS;
                 case 2, 4 -> State.Type.WARNING;
+                case 1, 3 -> State.Type.FAILED;
                 default -> State.Type.FAILED;
             });
         }

@@ -129,31 +129,10 @@ public abstract class AbstractSoda extends Task {
     @PluginProperty(group = "execution")
     protected Property<Map<String, String>> env;
 
-    /**
-     * Not {@code @NotNull} here: {@code configuration} is a Soda Core 3 (SodaCL) concept that only
-     * {@link Scan} requires. Subclasses targeting Soda Core 4 (e.g. {@link VerifyContract}) use a
-     * {@code dataSource} property instead and never set this field, so each subclass enforces its
-     * own required-ness rather than the shared base class assuming everyone needs it.
-     */
-    @Schema(
-        title = "The configuration file"
-    )
-    @PluginProperty(group = "main")
-    Property<Map<String, Object>> configuration;
-
     protected abstract String defaultImage();
 
     protected Map<String, String> finalInputFiles(RunContext runContext, Path workingDirectory) throws IOException, IllegalVariableEvaluationException {
-        Map<String, String> map = this.inputFiles != null ? new HashMap<>(PluginUtilsService.transformInputFiles(runContext, this.inputFiles)) : new HashMap<>();
-
-        if (this.configuration != null) {
-            var renderedConfig = runContext.render(configuration).asMap(String.class, Object.class);
-            if (!renderedConfig.isEmpty()) {
-                map.put("configuration.yml", MAPPER.writeValueAsString(renderedConfig));
-            }
-        }
-
-        return map;
+        return this.inputFiles != null ? new HashMap<>(PluginUtilsService.transformInputFiles(runContext, this.inputFiles)) : new HashMap<>();
     }
 
     public CommandsWrapper start(RunContext runContext) throws Exception {
