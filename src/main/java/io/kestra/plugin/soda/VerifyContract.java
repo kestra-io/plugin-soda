@@ -321,7 +321,7 @@ public class VerifyContract extends AbstractSoda implements RunnableTask<VerifyC
 
         @Schema(
             title = "Contract verification process exit code",
-            description = "0 no issues, 1 check failures, 2 check warnings, 3 log/session errors, 4 results not sent to Soda Cloud (not treated as a failure by this task)."
+            description = "0 no issues, 1 check failures, 2 check warnings, 3 log/session errors. Soda Core also defines 4 (results not sent to Soda Cloud), but this task never publishes to Soda Cloud so it never emits that code."
         )
         @NotNull
         private final int exitCode;
@@ -356,10 +356,13 @@ public class VerifyContract extends AbstractSoda implements RunnableTask<VerifyC
 
         @Override
         public Optional<State.Type> finalState() {
+            // Exit code 4 ("results not sent to Soda Cloud") is part of Soda Core's documented exit
+            // code contract but is never produced by this task's generated script, since it never
+            // publishes results to Soda Cloud. It is intentionally not special-cased here (dead code)
+            // and is left to `default` for forward compatibility should a future version add it.
             return Optional.of(switch (this.exitCode) {
                 case 0 -> State.Type.SUCCESS;
-                case 2, 4 -> State.Type.WARNING;
-                case 1, 3 -> State.Type.FAILED;
+                case 2 -> State.Type.WARNING;
                 default -> State.Type.FAILED;
             });
         }
