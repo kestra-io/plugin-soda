@@ -193,7 +193,15 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
         }
 
         if (variables != null) {
-            main += "scan.add_variables(" + JacksonMapper.ofJson().writeValueAsString(runContext.render(variables).asMap(String.class, Object.class)) + ")";
+            // JSON booleans/null (true/false/null) are not valid Python literals (Python needs
+            // True/False/None), so the rendered variables cannot be spliced directly into a Python
+            // dict-literal position. Instead, embed the JSON text as a Python string literal (by
+            // JSON-encoding it a second time, which produces valid Python string-escaping too) and
+            // parse it at runtime with `json.loads`, letting Python's own JSON parser produce the
+            // correct True/False/None values.
+            var variablesJson = JacksonMapper.ofJson().writeValueAsString(runContext.render(variables).asMap(String.class, Object.class));
+            var variablesLiteral = JacksonMapper.ofJson().writeValueAsString(variablesJson);
+            main += "scan.add_variables(json.loads(" + variablesLiteral + "))";
         }
 
         main += "\n" +
@@ -220,9 +228,9 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
         return Output.builder()
             .result(scanResult)
             .stdOutLineCount(output.getStdOutLineCount())
-            .stdErrLineCount(output.getStdOutLineCount())
+            .stdErrLineCount(output.getStdErrLineCount())
             .configuration(scrubSensitiveValues(runContext.render(configuration).asMap(String.class, Object.class)))
-            .exitCode((Integer) output.getVars().get("exitCode"))
+            .exitCode(parseExitCode(output))
             .build();
     }
 

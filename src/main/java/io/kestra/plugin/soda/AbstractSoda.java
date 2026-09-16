@@ -25,6 +25,7 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.plugin.scripts.exec.scripts.models.DockerOptions;
 import io.kestra.plugin.scripts.exec.scripts.models.RunnerType;
+import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 import io.kestra.plugin.scripts.exec.scripts.runners.CommandsWrapper;
 import io.kestra.plugin.scripts.runner.docker.Docker;
 
@@ -281,5 +282,26 @@ public abstract class AbstractSoda extends Task {
         }
 
         return false;
+    }
+
+    /**
+     * The generated Python scripts report their exit code through a {@code ::{"outputs": {"exitCode": N}}::}
+     * stdout directive, parsed by {@link ScriptOutput#getVars()}. If that directive is not captured
+     * (e.g. interleaved/garbled stdout), {@code getVars().get("exitCode")} is {@code null}; unboxing
+     * that straight into the Output builder's primitive {@code int exitCode} throws an
+     * {@link NullPointerException} that masks the real cause. Failing with a clear message here
+     * instead surfaces the actual problem (missing exit code directive) rather than a bare NPE.
+     */
+    protected static int parseExitCode(ScriptOutput output) {
+        Integer exitCode = (Integer) output.getVars().get("exitCode");
+
+        if (exitCode == null) {
+            throw new IllegalStateException(
+                "Soda process did not report an exit code: the `::{\"outputs\": {\"exitCode\": ...}}::` " +
+                    "stdout directive was not captured, likely due to interleaved or truncated output."
+            );
+        }
+
+        return exitCode;
     }
 }

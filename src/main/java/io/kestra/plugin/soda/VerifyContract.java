@@ -195,8 +195,12 @@ public class VerifyContract extends AbstractSoda implements RunnableTask<VerifyC
     /**
      * Field/property names below (``check_collection.data_source_name``/``dataset_name``,
      * ``check_results``, ``check.column_name``, ``outcome.value``, ``is_failed``/``is_warned``/
-     * ``has_errors``) are verified against a real soda-core 4.23.1 + soda-duckdb install, not
-     * guessed — see the PR description for how they were confirmed.
+     * ``has_errors``) as well as the ``ContractVerificationSession.execute(..., variables=...)``
+     * keyword argument are verified against a real soda-core 4.23.1 + soda-duckdb install, not
+     * guessed — see the PR description for how they were confirmed. Soda-core asserts that every
+     * variable value is a {@code str} or a {@code Number} (a Python {@code bool} passes, being a
+     * {@code Number} subtype); a variable rendered as a list, map, or {@code None} fails that
+     * assertion at execution time.
      */
     private String buildMainScript(RunContext runContext, List<String> contractFiles) throws IllegalVariableEvaluationException, IOException {
         var contractSourcesLiteral = contractFiles.stream()
@@ -221,7 +225,7 @@ public class VerifyContract extends AbstractSoda implements RunnableTask<VerifyC
                     'type': check.type,
                     'column': check.column_name,
                     'definition': check.definition,
-                    'outcome': check_result.outcome.value.lower(),
+                    'outcome': check_result.outcome.value.lower() if check_result.outcome is not None else None,
                 }
 
             def _serialize_contract(result):
@@ -307,7 +311,7 @@ public class VerifyContract extends AbstractSoda implements RunnableTask<VerifyC
             .hasFailures(Boolean.TRUE.equals(result.getHasFailures()))
             .hasWarnings(Boolean.TRUE.equals(result.getHasWarnings()))
             .hasErrors(Boolean.TRUE.equals(result.getHasErrors()))
-            .exitCode((Integer) output.getVars().get("exitCode"))
+            .exitCode(parseExitCode(output))
             .build();
     }
 
