@@ -189,7 +189,7 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
             "\n";
 
         if (runContext.render(verbose).as(Boolean.class).orElseThrow()) {
-            main += "scan.set_verbose()";
+            main += "scan.set_verbose()\n";
         }
 
         if (variables != null) {
@@ -201,11 +201,10 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
             // correct True/False/None values.
             var variablesJson = JacksonMapper.ofJson().writeValueAsString(runContext.render(variables).asMap(String.class, Object.class));
             var variablesLiteral = JacksonMapper.ofJson().writeValueAsString(variablesJson);
-            main += "scan.add_variables(json.loads(" + variablesLiteral + "))";
+            main += "scan.add_variables(json.loads(" + variablesLiteral + "))\n";
         }
 
-        main += "\n" +
-            "result = scan.execute()\n" +
+        main += "result = scan.execute()\n" +
             "\n" +
             "with open('{{workingDir}}/result.json', 'w') as out:\n" +
             "    out.write(json.dumps(SodaCloud.build_scan_results(scan)))\n" +
