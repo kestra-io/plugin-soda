@@ -1,5 +1,6 @@
 package io.kestra.plugin.soda;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -30,6 +31,28 @@ class ScanTest {
 
     @Inject
     private RunContextFactory runContextFactory;
+
+    @Test
+    void generatedScriptSeparatesVerboseAndVariables() throws Exception {
+        Scan task = Scan.builder()
+            .id("unit-test")
+            .type(Scan.class.getName())
+            .configuration(Property.ofValue(JacksonMapper.ofYaml().readValue(
+                "data_source kestra:\n  type: postgres\n", TYPE_REFERENCE
+            )))
+            .checks(JacksonMapper.ofYaml().readValue(
+                "checks for users:\n  - row_count > 0\n", TYPE_REFERENCE
+            ))
+            .verbose(Property.ofValue(true))
+            .variables(Property.ofValue(Map.of("env", "staging")))
+            .build();
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());
+        String script = task.finalInputFiles(runContext, Path.of(".")).get("main.py");
+
+        assertThat(script, containsString("scan.set_verbose()\nscan.add_variables(json.loads("));
+        assertThat(script, containsString("))\nresult = scan.execute()"));
+    }
 
     @Test
     void run() throws Exception {
