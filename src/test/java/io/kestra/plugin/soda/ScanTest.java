@@ -56,7 +56,7 @@ class ScanTest {
             )
             .checks(
                 JacksonMapper.ofYaml().readValue(
-                    "checks for orderDetail:\n" +
+                    "checks for " + UtilsTest.table("orderDetail") + ":\n" +
                         "  - row_count > 0\n" +
                         "  - max(unitPrice):\n" +
                         "      warn: when between 1 and 250\n" +
@@ -99,7 +99,7 @@ class ScanTest {
             )
             .checks(
                 JacksonMapper.ofYaml().readValue(
-                    "checks for territory:\n" +
+                    "checks for " + UtilsTest.table("territory") + ":\n" +
                         "  - row_count > 0\n" +
                         "  - failed rows:\n" +
                         "      name: Failed rows query test\n" +
@@ -140,7 +140,7 @@ class ScanTest {
             )
             .checks(
                 JacksonMapper.ofYaml().readValue(
-                    "checks for orderDetail:\n" +
+                    "checks for " + UtilsTest.table("orderDetail") + ":\n" +
                         "checks for invalid_table:\n" +
                         "  - row_count > 0",
                     TYPE_REFERENCE

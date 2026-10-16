@@ -17,12 +17,18 @@ DATASET="kestra_unit_test"
 
 gcloud config set project "${PROJECT_ID}" >/dev/null
 
+# Same per-run suffix as setup-unit.sh and UtilsTest.table(): only delete this run's tables.
+SUFFIX=""
+if [ -n "${GITHUB_RUN_ID:-}" ]; then
+  SUFFIX="_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT:-1}"
+fi
+
 echo "🧹 Deleting test tables from ${PROJECT_ID}:${DATASET}..."
 
 # List of tables created in setup-unit.sh
 TABLES=(
-  "orderDetail"
-  "territory"
+  "orderDetail${SUFFIX}"
+  "territory${SUFFIX}"
 )
 
 for TABLE in "${TABLES[@]}"; do
