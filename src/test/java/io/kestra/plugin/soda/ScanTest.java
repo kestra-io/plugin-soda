@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.ImmutableMap;
@@ -24,6 +25,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
 @KestraTest
+@EnabledIf("io.kestra.plugin.soda.UtilsTest#hasServiceAccount")
 class ScanTest {
     private static final TypeReference<Map<String, Object>> TYPE_REFERENCE = new TypeReference<>() {
     };
