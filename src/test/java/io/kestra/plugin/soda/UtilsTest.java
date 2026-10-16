@@ -8,6 +8,11 @@ import java.util.Objects;
 import com.google.common.io.CharStreams;
 
 public class UtilsTest {
+    // Used with @EnabledIf: the file is absent on fork/Dependabot CI runs where secrets are unavailable.
+    public static boolean hasServiceAccount() {
+        return UtilsTest.class.getClassLoader().getResource(".gcp-service-account.json") != null;
+    }
+
     public static String serviceAccount() throws Exception {
         File file = new File(
             Objects.requireNonNull(
