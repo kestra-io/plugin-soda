@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -52,6 +53,7 @@ public abstract class AbstractSoda extends AbstractExecScript {
     private static final String REDACTED = "******";
     protected static final String RESULT_FILE = "result.json";
     private static final Set<String> GENERATED_FILES = Set.of(RESULT_FILE, "main.py", "configuration.yml", "checks.yml", "data_source.yml");
+    private static final Pattern CONTRACT_FILE = Pattern.compile("contract-\\d+\\.yml");
 
     /**
      * Sensitive fragments matched as substrings of the normalized (alphanumeric-only, lowercased)
@@ -132,7 +134,7 @@ public abstract class AbstractSoda extends AbstractExecScript {
     // result.json is already in the task output and the generated files hold rendered credentials, a glob must not return them
     protected static Map<String, URI> userOutputFiles(ScriptOutput output) {
         var files = new HashMap<>(output.getOutputFiles());
-        files.keySet().removeIf(name -> GENERATED_FILES.contains(name) || name.startsWith("contract-"));
+        files.keySet().removeIf(name -> GENERATED_FILES.contains(name) || CONTRACT_FILE.matcher(name).matches());
         return files;
     }
 
@@ -141,14 +143,11 @@ public abstract class AbstractSoda extends AbstractExecScript {
     }
 
     public CommandsWrapper start(RunContext runContext) throws Exception {
-        var rOutputFiles = new ArrayList<>(runContext.render(this.getOutputFiles()).asList(String.class));
-        rOutputFiles.add(RESULT_FILE);
-
         var commandsWrapper = this.commands(runContext)
             .withRunnerType(runContext.render(this.getRunnerType()).as(RunnerType.class).orElse(null))
-            .withContainerImage(runContext.render(this.getContainerImage()).as(String.class).orElse(this.defaultImage()))
-            .withOutputFiles(rOutputFiles)
-            .withDockerOptions(injectDefaults(runContext, this.getDocker()));
+            .withContainerImage(runContext.render(this.getContainerImage()).as(String.class).orElse(this.defaultImage()));
+        var rOutputFiles = new ArrayList<>(commandsWrapper.getOutputFiles());
+        rOutputFiles.add(RESULT_FILE);
         Path workingDirectory = commandsWrapper.getWorkingDirectory();
 
         List<String> commands = new ArrayList<>();
@@ -162,6 +161,7 @@ public abstract class AbstractSoda extends AbstractExecScript {
         // core writes namespace files first, then these input files, so the generated script always wins
         return commandsWrapper
             .withInputFiles(this.finalInputFiles(runContext, workingDirectory))
+            .withOutputFiles(rOutputFiles)
             .addEnv(
                 Map.of(
                     "PYTHONUNBUFFERED", "true",
