@@ -1,6 +1,7 @@
 package io.kestra.plugin.soda;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -10,19 +11,22 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
-import io.kestra.core.models.tasks.Task;
 import io.kestra.core.models.tasks.runners.PluginUtilsService;
 import io.kestra.core.models.tasks.runners.TaskRunner;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
+import io.kestra.plugin.scripts.exec.AbstractExecScript;
 import io.kestra.plugin.scripts.exec.scripts.models.DockerOptions;
 import io.kestra.plugin.scripts.exec.scripts.models.RunnerType;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
@@ -39,13 +43,17 @@ import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 @SuperBuilder
-@ToString
+// callSuper = false keeps the inherited env out of toString, it can hold credentials
+@ToString(callSuper = false)
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-public abstract class AbstractSoda extends Task {
+public abstract class AbstractSoda extends AbstractExecScript {
     protected static final ObjectMapper MAPPER = JacksonMapper.ofYaml();
     private static final String REDACTED = "******";
+    protected static final String RESULT_FILE = "result.json";
+    private static final Set<String> GENERATED_FILES = Set.of(RESULT_FILE, "main.py", "configuration.yml", "checks.yml", "data_source.yml");
+    private static final Pattern CONTRACT_FILE = Pattern.compile("contract-\\d+\\.yml");
 
     /**
      * Sensitive fragments matched as substrings of the normalized (alphanumeric-only, lowercased)
@@ -70,7 +78,15 @@ public abstract class AbstractSoda extends Task {
     )
     @Deprecated
     @PluginProperty(group = "execution")
-    protected Property<RunnerType> runner;
+    @JsonProperty("runner")
+    protected Property<RunnerType> runnerType;
+
+    // Core has its own non-Property `runner`, kept null so YAML `runner` only binds to runnerType
+    @Override
+    @JsonIgnore
+    public RunnerType getRunner() {
+        return null;
+    }
 
     @Schema(
         title = "Deprecated, use 'taskRunner' instead"
@@ -107,44 +123,31 @@ public abstract class AbstractSoda extends Task {
     }
 
     @Schema(
-        title = "Input files are extra files that will be available in the dbt working directory",
-        description = "You can define the files as map or a JSON string. " +
-            "Each file can be defined inlined or can reference a file from Kestra's internal storage."
-    )
-    @PluginProperty(group = "source", 
-        additionalProperties = String.class,
-        dynamic = true
-    )
-    private Object inputFiles;
-
-    @Schema(
         title = "List of python dependencies to add to the python execution process",
         description = "Python dependencies list to setup in the virtualenv, in the same format than requirements.txt. It must at least provides dbt."
     )
     @PluginProperty(group = "advanced")
     protected Property<List<String>> requirements;
 
-    @Schema(
-        title = "Additional environment variables for the current process"
-    )
-    @PluginProperty(group = "execution")
-    protected Property<Map<String, String>> env;
-
     protected abstract String defaultImage();
 
+    // result.json is already in the task output and the generated files hold rendered credentials, a glob must not return them
+    protected static Map<String, URI> userOutputFiles(ScriptOutput output) {
+        var files = new HashMap<>(output.getOutputFiles());
+        files.keySet().removeIf(name -> GENERATED_FILES.contains(name) || CONTRACT_FILE.matcher(name).matches());
+        return files;
+    }
+
     protected Map<String, String> finalInputFiles(RunContext runContext, Path workingDirectory) throws IOException, IllegalVariableEvaluationException {
-        return this.inputFiles != null ? new HashMap<>(PluginUtilsService.transformInputFiles(runContext, this.inputFiles)) : new HashMap<>();
+        return this.getInputFiles() != null ? new HashMap<>(PluginUtilsService.transformInputFiles(runContext, this.getInputFiles())) : new HashMap<>();
     }
 
     public CommandsWrapper start(RunContext runContext) throws Exception {
-        var env = runContext.render(this.getEnv()).asMap(String.class, String.class);
-        CommandsWrapper commandsWrapper = new CommandsWrapper(runContext)
-            .withEnv(env.isEmpty() ? new HashMap<>() : env)
-            .withRunnerType(runContext.render(this.getRunner()).as(RunnerType.class).orElse(null))
-            .withTaskRunner(this.taskRunner)
-            .withContainerImage(runContext.render(this.getContainerImage()).as(String.class).orElse(this.defaultImage()))
-            .withOutputFiles(List.of("result.json"))
-            .withDockerOptions(injectDefaults(this.getDocker()));
+        var commandsWrapper = this.commands(runContext)
+            .withRunnerType(runContext.render(this.getRunnerType()).as(RunnerType.class).orElse(null))
+            .withContainerImage(runContext.render(this.getContainerImage()).as(String.class).orElse(this.defaultImage()));
+        var rOutputFiles = new ArrayList<>(commandsWrapper.getOutputFiles());
+        rOutputFiles.add(RESULT_FILE);
         Path workingDirectory = commandsWrapper.getWorkingDirectory();
 
         List<String> commands = new ArrayList<>();
@@ -155,25 +158,24 @@ public abstract class AbstractSoda extends Task {
             commands.add("python {{workingDir}}/main.py");
         }
 
-        PluginUtilsService.createInputFiles(
-            runContext,
-            workingDirectory,
-            this.finalInputFiles(runContext, workingDirectory),
-            this.taskRunner.additionalVars(runContext, commandsWrapper)
-        );
-
+        // core writes namespace files first, then these input files, so the generated script always wins
         return commandsWrapper
+            .withInputFiles(this.finalInputFiles(runContext, workingDirectory))
+            .withOutputFiles(rOutputFiles)
             .addEnv(
                 Map.of(
                     "PYTHONUNBUFFERED", "true",
                     "PIP_ROOT_USER_ACTION", "ignore"
                 )
             )
-            .withInterpreter(Property.ofValue(List.of("/bin/sh", "-c")))
+            .withInterpreter(this.getInterpreter())
+            .withBeforeCommands(this.getBeforeCommands())
+            .withBeforeCommandsWithOptions(true)
             .withCommands(Property.ofExpression(JacksonMapper.ofJson().writeValueAsString(commands)));
     }
 
-    private DockerOptions injectDefaults(DockerOptions original) {
+    @Override
+    protected DockerOptions injectDefaults(RunContext runContext, DockerOptions original) {
         if (original == null) {
             return null;
         }

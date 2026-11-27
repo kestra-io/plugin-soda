@@ -1,10 +1,14 @@
 package io.kestra.plugin.soda;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
@@ -14,9 +18,11 @@ import com.google.common.collect.ImmutableMap;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.flows.State;
 import io.kestra.core.models.property.Property;
+import io.kestra.core.models.tasks.NamespaceFiles;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.JacksonMapper;
+import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.scripts.runner.docker.Docker;
 
@@ -99,6 +105,35 @@ class VerifyContractTest {
         assertThat(runOutput.getCheckCount(), is(2));
         assertThat(runOutput.getResult().getContractResults(), hasSize(1));
         assertThat(runOutput.finalState().get(), is(State.Type.WARNING));
+    }
+
+    @Test
+    void namespaceMainPyBeforeCommandsAndOutputFilesLeaveTheGeneratedScriptAlone() throws Exception {
+        var runContext = runContextFactory.of(ImmutableMap.of());
+
+        var task = VerifyContract.builder()
+            .id(IdUtils.create())
+            .type(VerifyContract.class.getName())
+            .taskRunner(Docker.builder().type(Docker.class.getName()).build())
+            .inputFiles(inputFiles(runContext))
+            .namespaceFiles(NamespaceFiles.builder().enabled(Property.ofValue(true)).build())
+            .requirements(Property.ofValue(List.of("soda-core==4.23.1", "soda-duckdb==4.23.1")))
+            .dataSource(Property.ofValue(duckDbDataSource()))
+            .contracts(Property.ofValue(JacksonMapper.ofYaml().readValue("""
+                - dataset: kestra/orders
+                  columns:
+                    - name: id
+                """, LIST_TYPE_REFERENCE)))
+            .beforeCommands(Property.ofValue(List.of("echo prepared > before.txt")))
+            .outputFiles(Property.ofValue(List.of("before.txt", "*.yml")))
+            .build();
+
+        runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());
+        runContext.storage().namespace().putFile(Path.of("main.py"), new ByteArrayInputStream("raise SystemExit(1)".getBytes(StandardCharsets.UTF_8)));
+        var runOutput = task.run(runContext);
+
+        assertThat(runOutput.getExitCode(), is(0));
+        assertThat(runOutput.getOutputFiles().keySet(), is(Set.of("before.txt")));
     }
 
     @Test

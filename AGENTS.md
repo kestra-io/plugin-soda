@@ -23,7 +23,7 @@ Single-module plugin. Source packages under `io.kestra.plugin`:
 
 - `io.kestra.plugin.soda.Scan` (deprecated — Soda Core 3 / SodaCL, pinned to `sodadata/soda-core:v3.5.2`)
 - `io.kestra.plugin.soda.VerifyContract` (Soda Core 4 data contracts, default image `python:3.12-slim`)
-- `io.kestra.plugin.soda.AbstractSoda` (shared base: task runner, `requirements`/venv setup, sensitive-value scrubbing)
+- `io.kestra.plugin.soda.AbstractSoda` (shared base, extends `AbstractExecScript` for `beforeCommands`, `outputFiles`, namespace files and `durable` on Kestra 2.1+, and adds the task runner, `requirements`/venv setup and sensitive-value scrubbing)
 
 ### Project Structure
 

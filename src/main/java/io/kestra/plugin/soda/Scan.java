@@ -1,6 +1,7 @@
 package io.kestra.plugin.soda;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
@@ -32,7 +33,8 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @Schema(
     title = "Run Soda scan and report results",
-    description = "Executes SodaCL checks with the provided configuration, writes scan results to internal storage, and emits metrics to Kestra. Uses a pinned Soda Core 3 container by default, runs non-verbose unless `verbose` is true, and requires both configuration and checks to be supplied.\n\n" +
+    description = "Executes SodaCL checks with the provided configuration, writes scan results to internal storage, and emits metrics to Kestra. Uses a pinned Soda Core 3 container by default, runs non-verbose unless `verbose` is true, and requires both configuration and checks to be supplied.\n\n"
+        +
         "Deprecated: Soda Core 3 is end-of-line and pinned to `sodadata/soda-core:v3.5.2` to prevent an unannounced upgrade. Use `io.kestra.plugin.soda.VerifyContract` for Soda Core 4 instead — this is not a drop-in swap, SodaCL `checks` must be rewritten as Soda Core 4 data contracts (`dataset` + `columns` + `checks` YAML).",
     deprecated = true
 )
@@ -160,8 +162,10 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
                     "If you are trying to verify a Soda Core 4 data contract, use `io.kestra.plugin.soda.VerifyContract` instead."
             );
         }
-        if (renderedConfig.keySet().stream().noneMatch(key -> key.startsWith("data_source "))
-            && (renderedConfig.containsKey("dataset") || renderedConfig.containsKey("columns"))) {
+        if (
+            renderedConfig.keySet().stream().noneMatch(key -> key.startsWith("data_source "))
+                && (renderedConfig.containsKey("dataset") || renderedConfig.containsKey("columns"))
+        ) {
             throw new IllegalArgumentException(
                 "`configuration` looks like a Soda Core 4 data contract (found `dataset`/`columns` keys) rather than a SodaCL 3.x `data_source <name>:` block. " +
                     "Use `io.kestra.plugin.soda.VerifyContract` to verify data contracts."
@@ -231,12 +235,13 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
             .stdErrLineCount(output.getStdErrLineCount())
             .configuration(scrubSensitiveValues(runContext.render(configuration).asMap(String.class, Object.class)))
             .exitCode(parseExitCode(output))
+            .outputFiles(userOutputFiles(output))
             .build();
     }
 
     protected ScanResult parseResult(RunContext runContext, ScriptOutput output) throws IOException {
         ScanResult scanResult = JacksonMapper.ofJson(false).readValue(
-            runContext.storage().getFile(output.getOutputFiles().get("result.json")),
+            runContext.storage().getFile(output.getOutputFiles().get(RESULT_FILE)),
             ScanResult.class
         );
 
@@ -299,6 +304,14 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
         )
         @NotNull
         private Map<String, Object> configuration;
+
+        @Schema(
+            title = "Output files",
+            description = """
+                Files listed in the task's `outputFiles` property, uploaded to Kestra's internal storage.
+                """
+        )
+        private final Map<String, URI> outputFiles;
 
         @Override
         public Optional<State.Type> finalState() {
