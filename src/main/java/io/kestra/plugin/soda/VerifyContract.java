@@ -1,12 +1,15 @@
 package io.kestra.plugin.soda;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
@@ -21,8 +24,6 @@ import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 import io.kestra.plugin.scripts.exec.scripts.runners.CommandsWrapper;
 import io.kestra.plugin.soda.models.ContractVerificationResult;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -35,7 +36,8 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @Schema(
     title = "Verify a Soda Core 4 data contract and report results",
-    description = "Verifies one or more Soda Core 4 data contracts (`dataset` + `columns` + `checks` YAML) against the provided data source, writes the verification result to internal storage, and marks the task according to the outcome. " +
+    description = "Verifies one or more Soda Core 4 data contracts (`dataset` + `columns` + `checks` YAML) against the provided data source, writes the verification result to internal storage, and marks the task according to the outcome. "
+        +
         "Unlike `Scan`, this task targets Soda Core 4, which replaced SodaCL scans with data contracts and has no official Docker image yet — the default `python:3.12-slim` image expects `requirements` to install `soda-core` and the relevant connector (e.g. `soda-duckdb`, `soda-postgres`)."
 )
 @Plugin(
@@ -298,9 +300,10 @@ public class VerifyContract extends AbstractSoda implements RunnableTask<VerifyC
 
         ContractVerificationResult result = parseResult(runContext, output);
 
-        var checkCount = result.getContractResults() == null ? 0 : result.getContractResults().stream()
-            .mapToInt(contract -> contract.getChecks() == null ? 0 : contract.getChecks().size())
-            .sum();
+        var checkCount = result.getContractResults() == null ? 0
+            : result.getContractResults().stream()
+                .mapToInt(contract -> contract.getChecks() == null ? 0 : contract.getChecks().size())
+                .sum();
 
         return Output.builder()
             .result(result)
@@ -312,12 +315,13 @@ public class VerifyContract extends AbstractSoda implements RunnableTask<VerifyC
             .hasWarnings(Boolean.TRUE.equals(result.getHasWarnings()))
             .hasErrors(Boolean.TRUE.equals(result.getHasErrors()))
             .exitCode(parseExitCode(output))
+            .outputFiles(userOutputFiles(output))
             .build();
     }
 
     protected ContractVerificationResult parseResult(RunContext runContext, ScriptOutput output) throws IOException {
         return JacksonMapper.ofJson(false).readValue(
-            runContext.storage().getFile(output.getOutputFiles().get("result.json")),
+            runContext.storage().getFile(output.getOutputFiles().get(RESULT_FILE)),
             ContractVerificationResult.class
         );
     }
@@ -377,6 +381,12 @@ public class VerifyContract extends AbstractSoda implements RunnableTask<VerifyC
         )
         @NotNull
         private final Map<String, Object> dataSource;
+
+        @Schema(
+            title = "Output files",
+            description = "Files listed in the task's `outputFiles` property, uploaded to Kestra's internal storage."
+        )
+        private final Map<String, URI> outputFiles;
 
         @Override
         public Optional<State.Type> finalState() {
