@@ -125,7 +125,7 @@ class VerifyContractTest {
                     - name: id
                 """, LIST_TYPE_REFERENCE)))
             .beforeCommands(Property.ofValue(List.of("echo prepared > before.txt")))
-            .outputFiles(Property.ofValue(List.of("before.txt")))
+            .outputFiles(Property.ofValue(List.of("before.txt", "*.yml")))
             .build();
 
         runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());

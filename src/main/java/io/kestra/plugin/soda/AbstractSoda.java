@@ -25,7 +25,6 @@ import io.kestra.core.models.tasks.runners.PluginUtilsService;
 import io.kestra.core.models.tasks.runners.TaskRunner;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
-import io.kestra.core.utils.NamespaceFilesUtils;
 import io.kestra.plugin.scripts.exec.AbstractExecScript;
 import io.kestra.plugin.scripts.exec.scripts.models.DockerOptions;
 import io.kestra.plugin.scripts.exec.scripts.models.RunnerType;
@@ -52,6 +51,7 @@ public abstract class AbstractSoda extends AbstractExecScript {
     protected static final ObjectMapper MAPPER = JacksonMapper.ofYaml();
     private static final String REDACTED = "******";
     protected static final String RESULT_FILE = "result.json";
+    private static final Set<String> GENERATED_FILES = Set.of(RESULT_FILE, "main.py", "configuration.yml", "checks.yml", "data_source.yml");
 
     /**
      * Sensitive fragments matched as substrings of the normalized (alphanumeric-only, lowercased)
@@ -129,10 +129,10 @@ public abstract class AbstractSoda extends AbstractExecScript {
 
     protected abstract String defaultImage();
 
-    // result.json is already parsed into the task output, only the user's files are returned here
+    // result.json is already in the task output and the generated files hold rendered credentials, a glob must not return them
     protected static Map<String, URI> userOutputFiles(ScriptOutput output) {
         var files = new HashMap<>(output.getOutputFiles());
-        files.remove(RESULT_FILE);
+        files.keySet().removeIf(name -> GENERATED_FILES.contains(name) || name.startsWith("contract-"));
         return files;
     }
 
@@ -148,10 +148,7 @@ public abstract class AbstractSoda extends AbstractExecScript {
             .withRunnerType(runContext.render(this.getRunnerType()).as(RunnerType.class).orElse(null))
             .withContainerImage(runContext.render(this.getContainerImage()).as(String.class).orElse(this.defaultImage()))
             .withOutputFiles(rOutputFiles)
-            .withDockerOptions(injectDefaults(this.getDocker()))
-            // input and namespace files are written below, before the generated ones, the wrapper must not write them again
-            .withInputFiles(null)
-            .withNamespaceFiles(null);
+            .withDockerOptions(injectDefaults(runContext, this.getDocker()));
         Path workingDirectory = commandsWrapper.getWorkingDirectory();
 
         List<String> commands = new ArrayList<>();
@@ -162,20 +159,9 @@ public abstract class AbstractSoda extends AbstractExecScript {
             commands.add("python {{workingDir}}/main.py");
         }
 
-        var namespaceFiles = this.getNamespaceFiles();
-        // loaded first, like core script tasks, so a namespace main.py cannot replace the generated one
-        if (namespaceFiles != null && !Boolean.FALSE.equals(runContext.render(namespaceFiles.getEnabled()).as(Boolean.class).orElse(true))) {
-            NamespaceFilesUtils.loadNamespaceFiles(runContext, namespaceFiles);
-        }
-
-        PluginUtilsService.createInputFiles(
-            runContext,
-            workingDirectory,
-            this.finalInputFiles(runContext, workingDirectory),
-            this.taskRunner.additionalVars(runContext, commandsWrapper)
-        );
-
+        // core writes namespace files first, then these input files, so the generated script always wins
         return commandsWrapper
+            .withInputFiles(this.finalInputFiles(runContext, workingDirectory))
             .addEnv(
                 Map.of(
                     "PYTHONUNBUFFERED", "true",
@@ -189,7 +175,7 @@ public abstract class AbstractSoda extends AbstractExecScript {
     }
 
     @Override
-    protected DockerOptions injectDefaults(DockerOptions original) {
+    protected DockerOptions injectDefaults(RunContext runContext, DockerOptions original) {
         if (original == null) {
             return null;
         }

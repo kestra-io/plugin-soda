@@ -6,6 +6,8 @@ Run Soda data quality checks from Kestra flows inside a container.
 
 `taskRunner` controls where the container runs — defaults to Docker. Add extra Python packages via `requirements`. Each task picks its own default `containerImage` — see below.
 
+Shell lines in `beforeCommands` run before Soda. Files listed in `outputFiles` are returned in the `outputFiles` output, without the generated script and config files. On Kestra 2.1+, `durable: true` lets `beforeCommands` save and read checkpoints.
+
 ## Tasks
 
 `Scan` (**deprecated**) runs a Soda Core 3 scan — set `configuration` as a map matching Soda's YAML connection config (data source type, connection details, and credentials). Set `checks` as a map of SodaCL check definitions. Data source credentials should reference [secrets](https://kestra.io/docs/concepts/secret) via Kestra's expression syntax. Pass extra files via `inputFiles` or pull them from [namespace files](https://kestra.io/docs/concepts/namespace-files). Set `variables` to pass runtime values into checks. The output includes `result` with pass/warn/fail outcomes per check, plus `hasErrors`, `hasWarnings`, and `hasFailures` flags. `containerImage` defaults to a pinned `sodadata/soda-core:v3.5.2` (Soda Core 3 is end-of-line and has no newer image). Apply runner properties globally with [plugin defaults](https://kestra.io/docs/workflow-components/plugin-defaults).

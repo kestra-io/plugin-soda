@@ -307,7 +307,9 @@ public class Scan extends AbstractSoda implements RunnableTask<Scan.Output> {
 
         @Schema(
             title = "Output files",
-            description = "Files listed in the task's `outputFiles` property, uploaded to Kestra's internal storage."
+            description = """
+                Files listed in the task's `outputFiles` property, uploaded to Kestra's internal storage.
+                """
         )
         private final Map<String, URI> outputFiles;
 

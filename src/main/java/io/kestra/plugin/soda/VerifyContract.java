@@ -384,7 +384,9 @@ public class VerifyContract extends AbstractSoda implements RunnableTask<VerifyC
 
         @Schema(
             title = "Output files",
-            description = "Files listed in the task's `outputFiles` property, uploaded to Kestra's internal storage."
+            description = """
+                Files listed in the task's `outputFiles` property, uploaded to Kestra's internal storage.
+                """
         )
         private final Map<String, URI> outputFiles;
 

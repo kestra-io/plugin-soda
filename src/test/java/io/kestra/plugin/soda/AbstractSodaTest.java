@@ -24,17 +24,20 @@ class AbstractSodaTest {
     private RunContextFactory runContextFactory;
 
     @Test
-    void deprecatedRunnerYamlStillBindsAsAProperty() throws Exception {
+    void deprecatedRunnerAndDockerYamlStillBind() throws Exception {
         var task = JacksonMapper.ofYaml().readValue("""
             id: scan
             type: io.kestra.plugin.soda.Scan
             runner: PROCESS
+            docker:
+              image: custom:1
             env:
               MY_VAR: value
             """, Scan.class);
         var runContext = runContextFactory.of(Map.of());
 
         assertThat(runContext.render(task.getRunnerType()).as(RunnerType.class).orElseThrow(() -> new IllegalStateException("`runner` did not bind")), is(RunnerType.PROCESS));
+        assertThat(task.getDocker().getImage(), is("custom:1"));
         assertThat(runContext.render(task.getEnv()).asMap(String.class, String.class), is(Map.of("MY_VAR", "value")));
     }
 
